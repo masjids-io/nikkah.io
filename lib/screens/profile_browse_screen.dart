@@ -2,7 +2,14 @@ import 'package:flutter/material.dart';
 import '../services/profile_service.dart';
 
 class ProfileBrowseScreen extends StatefulWidget {
-  const ProfileBrowseScreen({super.key});
+  final Function(Map<String, dynamic>)? onStartChat;
+  final bool hasActiveChat;
+
+  const ProfileBrowseScreen({
+    super.key,
+    this.onStartChat,
+    this.hasActiveChat = false,
+  });
 
   @override
   State<ProfileBrowseScreen> createState() => _ProfileBrowseScreenState();
@@ -98,12 +105,57 @@ class _ProfileBrowseScreenState extends State<ProfileBrowseScreen> {
   }
 
   void _viewProfile(Map<String, dynamic> profile) {
-    // Navigate to profile detail view
-    // In a real app, this would navigate to a detailed profile view
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Viewing ${profile['name']}\'s profile'),
-        duration: const Duration(seconds: 2),
+    // Check if there's an active chat
+    if (widget.hasActiveChat) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+              'Please end your current chat before viewing other profiles'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    // Show profile view options
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.person, color: Color(0xFF2E7D32)),
+              title: const Text('View Profile'),
+              subtitle: Text('See ${profile['name']}\'s full profile'),
+              onTap: () {
+                Navigator.of(context).pop();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Viewing ${profile['name']}\'s profile'),
+                    duration: const Duration(seconds: 2),
+                  ),
+                );
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.chat, color: Color(0xFF2E7D32)),
+              title: const Text('Start Chat'),
+              subtitle: Text('Begin chatting with ${profile['name']}'),
+              onTap: () {
+                Navigator.of(context).pop();
+                if (widget.onStartChat != null) {
+                  widget.onStartChat!({
+                    'name': profile['name'] ?? 'Unknown',
+                    'age': profile['age'] ?? 0,
+                    'location': profile['location'] ?? 'Unknown',
+                  });
+                }
+              },
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'profile_browse_screen.dart';
 import 'profile_view_screen.dart';
+import 'chat_screen.dart';
 
 class MainNavigationScreen extends StatefulWidget {
   const MainNavigationScreen({super.key});
@@ -11,24 +12,51 @@ class MainNavigationScreen extends StatefulWidget {
 
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
   int _currentIndex = 0;
+  Map<String, dynamic>? _activeChatPartner;
 
-  final List<Widget> _screens = [
-    const HomeTab(),
-    const ProfileBrowseScreen(),
-    const ProfileViewScreen(),
-    const SettingsTab(),
-  ];
+  void _setActiveChat(Map<String, dynamic>? chatPartner) {
+    setState(() {
+      _activeChatPartner = chatPartner;
+      if (chatPartner != null) {
+        _currentIndex = 2; // Switch to chat tab
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: IndexedStack(
         index: _currentIndex,
-        children: _screens,
+        children: [
+          const HomeTab(),
+          ProfileBrowseScreen(
+            onStartChat: _setActiveChat,
+            hasActiveChat: _activeChatPartner != null,
+          ),
+          ChatTab(
+            chatPartner: _activeChatPartner,
+            onEndChat: () => _setActiveChat(null),
+          ),
+          const ProfileViewScreen(),
+          const SettingsTab(),
+        ],
       ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
         onTap: (index) {
+          // Prevent switching to browse if there's an active chat
+          if (index == 1 && _activeChatPartner != null) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                    'Please end your current chat before browsing profiles'),
+                backgroundColor: Colors.orange,
+              ),
+            );
+            return;
+          }
+
           setState(() {
             _currentIndex = index;
           });
@@ -46,25 +74,107 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
           fontSize: 12,
         ),
         elevation: 8,
-        items: const [
-          BottomNavigationBarItem(
+        items: [
+          const BottomNavigationBarItem(
             icon: Icon(Icons.home),
             label: 'Home',
           ),
-          BottomNavigationBarItem(
+          const BottomNavigationBarItem(
             icon: Icon(Icons.people),
             label: 'Browse',
           ),
-          BottomNavigationBarItem(
+          const BottomNavigationBarItem(
+            icon: Icon(Icons.chat),
+            label: 'Chat',
+          ),
+          const BottomNavigationBarItem(
             icon: Icon(Icons.person),
             label: 'Profile',
           ),
-          BottomNavigationBarItem(
+          const BottomNavigationBarItem(
             icon: Icon(Icons.settings),
             label: 'Settings',
           ),
         ],
       ),
+    );
+  }
+}
+
+class ChatTab extends StatelessWidget {
+  final Map<String, dynamic>? chatPartner;
+  final VoidCallback onEndChat;
+
+  const ChatTab({
+    super.key,
+    required this.chatPartner,
+    required this.onEndChat,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (chatPartner == null) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text(
+            'Chat',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          backgroundColor: const Color(0xFF2E7D32),
+          elevation: 0,
+        ),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(
+                Icons.chat_bubble_outline,
+                size: 64,
+                color: Colors.grey,
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'No active chat',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Start browsing profiles to find your match',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey,
+                ),
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton(
+                onPressed: () {
+                  // Navigate to browse profiles
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Use the Browse tab to find matches!'),
+                    ),
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF2E7D32),
+                ),
+                child: const Text('Browse Profiles'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return ChatScreen(
+      chatPartner: chatPartner,
     );
   }
 }
