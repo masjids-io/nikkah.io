@@ -12,6 +12,7 @@ import 'package:nikkah_io/main.dart';
 import 'package:nikkah_io/intro_screen.dart';
 import 'package:nikkah_io/screens/login_screen.dart';
 import 'package:nikkah_io/screens/register_screen.dart';
+import 'package:nikkah_io/screens/main_navigation_screen.dart';
 
 void main() {
   group('Nikkah.io App Tests', () {
@@ -104,20 +105,22 @@ void main() {
       expect(find.byType(Container), findsWidgets);
     });
 
-    testWidgets('Home screen displays correctly', (WidgetTester tester) async {
-      // Build home screen directly
-      await tester.pumpWidget(const MaterialApp(
-          home: MyHomePage(title: 'Nikkah.io - Muslim Matrimonial App')));
+    testWidgets('Main navigation screen displays correctly',
+        (WidgetTester tester) async {
+      // Build main navigation screen directly
+      await tester.pumpWidget(const MaterialApp(home: MainNavigationScreen()));
 
-      // Verify that home screen elements are present
+      // Verify that bottom navigation bar is present
+      expect(find.byType(BottomNavigationBar), findsOneWidget);
+      expect(find.text('Home'), findsOneWidget);
+      expect(find.text('Browse'), findsOneWidget);
+      expect(find.text('Profile'), findsOneWidget);
+      expect(find.text('Settings'), findsOneWidget);
+
+      // Verify that home tab content is displayed
+      expect(find.text('Nikkah.io'), findsOneWidget);
       expect(find.text('Welcome to Nikkah.io'), findsOneWidget);
-      expect(find.text('Your journey to finding your soulmate starts here'),
-          findsOneWidget);
       expect(find.text('Quick Actions'), findsOneWidget);
-      expect(find.text('Create Profile'), findsOneWidget);
-      expect(find.text('My Profile'), findsOneWidget);
-      expect(find.text('Browse Profiles'), findsOneWidget);
-      expect(find.text('Logout'), findsOneWidget);
     });
   });
 }
