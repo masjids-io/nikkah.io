@@ -58,10 +58,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
       final result = await AuthService.register(userData);
 
       if (mounted) {
-        Navigator.of(context).pushReplacementNamed('/home');
+        Navigator.of(context).pushReplacementNamed('/profile-creation');
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Registration successful! Welcome to Nikkah.io'),
+            content:
+                Text('Registration successful! Now let\'s create your profile'),
             backgroundColor: Colors.green,
           ),
         );
