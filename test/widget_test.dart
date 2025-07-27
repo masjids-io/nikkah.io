@@ -9,6 +9,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:nikkah_io/main.dart';
+import 'package:nikkah_io/intro_screen.dart';
+import 'package:nikkah_io/screens/login_screen.dart';
+import 'package:nikkah_io/screens/register_screen.dart';
 
 void main() {
   group('Nikkah.io App Tests', () {
@@ -32,7 +35,7 @@ void main() {
       await tester.pumpAndSettle(const Duration(seconds: 4));
     });
 
-    testWidgets('Splash screen navigates to home after delay',
+    testWidgets('Splash screen navigates to intro after delay',
         (WidgetTester tester) async {
       // Build our app and trigger a frame.
       await tester.pumpWidget(const MyApp());
@@ -44,7 +47,7 @@ void main() {
       // Wait for navigation to complete (3 seconds + buffer)
       await tester.pumpAndSettle(const Duration(seconds: 4));
 
-      // After navigation, we should see home screen
+      // After navigation, we should see intro screen
       expect(find.text('Welcome to Nikkah.io'), findsOneWidget);
       expect(find.text('Your journey to finding your soulmate starts here'),
           findsOneWidget);
@@ -54,12 +57,67 @@ void main() {
       expect(find.text('Loading...'), findsNothing);
     });
 
+    testWidgets('Login screen displays correctly', (WidgetTester tester) async {
+      // Build login screen directly
+      await tester.pumpWidget(const MaterialApp(home: LoginScreen()));
+
+      // Verify login screen elements are present
+      expect(find.text('Welcome Back'), findsOneWidget);
+      expect(find.text('Sign in to continue your journey'), findsOneWidget);
+      expect(find.text('Password'), findsOneWidget);
+      expect(find.text('Sign In'), findsOneWidget);
+      expect(find.text('Sign Up'), findsOneWidget);
+
+      // Check for form fields by their labels
+      expect(find.byType(TextFormField), findsNWidgets(2));
+    });
+
+    testWidgets('Register screen displays correctly',
+        (WidgetTester tester) async {
+      // Build register screen directly
+      await tester.pumpWidget(const MaterialApp(home: RegisterScreen()));
+
+      // Verify register screen elements are present
+      expect(
+          find.text('Join Nikkah.io and start your journey'), findsOneWidget);
+      expect(find.text('Password'), findsOneWidget);
+      expect(find.text('Confirm Password'), findsOneWidget);
+
+      expect(find.text('Sign In'), findsOneWidget);
+
+      // Check for form fields by their types
+      expect(find.byType(TextFormField), findsNWidgets(7));
+    });
+
+    testWidgets('Intro screen displays correctly', (WidgetTester tester) async {
+      // Build intro screen directly
+      await tester.pumpWidget(const MaterialApp(home: IntroScreen()));
+
+      // Verify intro screen elements are present
+      expect(find.text('Welcome to Nikkah.io'), findsOneWidget);
+      expect(find.text('Your journey to finding your soulmate starts here'),
+          findsOneWidget);
+      expect(find.text('Skip'), findsOneWidget);
+      expect(find.text('Next'), findsOneWidget);
+
+      // Verify page indicators are present
+      expect(find.byType(Container), findsWidgets);
+    });
+
     testWidgets('Counter increments smoke test', (WidgetTester tester) async {
       // Build our app and trigger a frame.
       await tester.pumpWidget(const MyApp());
 
       // Wait for splash screen to complete
       await tester.pumpAndSettle(const Duration(seconds: 4));
+
+      // Skip intro by tapping skip button
+      await tester.tap(find.text('Skip'));
+      await tester.pumpAndSettle();
+
+      // Navigate to home screen (bypassing auth for test)
+      await tester.pumpWidget(const MaterialApp(
+          home: MyHomePage(title: 'Nikkah.io - Muslim Matrimonial App')));
 
       // Verify that our counter starts at 0.
       expect(find.text('0'), findsOneWidget);
