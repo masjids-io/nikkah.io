@@ -16,25 +16,11 @@ class _ProfileBrowseScreenState extends State<ProfileBrowseScreen> {
   String? _nextPageToken;
   bool _hasMoreProfiles = true;
 
-  // Search and filter controllers
+  // Search controller
   final _searchController = TextEditingController();
-  String _selectedGender = 'ALL';
-  String _selectedAgeRange = 'ALL';
-  String _selectedSortBy = 'RECENT';
 
-  final List<String> _genderOptions = ['ALL', 'MALE', 'FEMALE'];
-  final List<String> _ageRangeOptions = [
-    'ALL',
-    '18-25',
-    '26-35',
-    '36-45',
-    '46+',
-  ];
-  final List<String> _sortOptions = [
-    'RECENT',
-    'NAME',
-    'AGE',
-  ];
+  // Filter state
+  Map<String, dynamic>? _currentFilters;
 
   @override
   void initState() {
@@ -100,18 +86,15 @@ class _ProfileBrowseScreenState extends State<ProfileBrowseScreen> {
     await _loadProfiles(refresh: true);
   }
 
-  void _applyFilters() {
-    _loadProfiles(refresh: true);
-  }
-
-  void _resetFilters() {
-    setState(() {
-      _selectedGender = 'ALL';
-      _selectedAgeRange = 'ALL';
-      _selectedSortBy = 'RECENT';
-      _searchController.clear();
-    });
-    _loadProfiles(refresh: true);
+  Future<void> _openFilters() async {
+    final result = await Navigator.of(context).pushNamed('/filters');
+    if (result != null && result is Map<String, dynamic>) {
+      setState(() {
+        _currentFilters = result;
+      });
+      // Apply the filters by reloading profiles
+      await _loadProfiles(refresh: true);
+    }
   }
 
   void _viewProfile(Map<String, dynamic> profile) {
@@ -141,7 +124,7 @@ class _ProfileBrowseScreenState extends State<ProfileBrowseScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.filter_list, color: Colors.white),
-            onPressed: _showFilterDialog,
+            onPressed: _openFilters,
             tooltip: 'Filter Profiles',
           ),
         ],
@@ -151,8 +134,8 @@ class _ProfileBrowseScreenState extends State<ProfileBrowseScreen> {
           // Search Bar
           _buildSearchBar(),
 
-          // Filter Chips
-          _buildFilterChips(),
+          // Active Filters Display
+          if (_currentFilters != null) _buildActiveFilters(),
 
           // Profiles List
           Expanded(
@@ -205,20 +188,15 @@ class _ProfileBrowseScreenState extends State<ProfileBrowseScreen> {
           Expanded(
             child: TextField(
               controller: _searchController,
-              decoration: InputDecoration(
+              decoration: const InputDecoration(
                 hintText: 'Search profiles...',
-                prefixIcon: const Icon(Icons.search, color: Color(0xFF2E7D32)),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: const BorderSide(color: Color(0xFF2E7D32)),
-                ),
+                prefixIcon: Icon(Icons.search, color: Color(0xFF2E7D32)),
+                border: OutlineInputBorder(),
                 focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide:
-                      const BorderSide(color: Color(0xFF2E7D32), width: 2),
+                  borderSide: BorderSide(color: Color(0xFF2E7D32), width: 2),
                 ),
                 contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               ),
               onSubmitted: (_) => _searchProfiles(),
             ),
@@ -240,12 +218,23 @@ class _ProfileBrowseScreenState extends State<ProfileBrowseScreen> {
     );
   }
 
-  Widget _buildFilterChips() {
+  Widget _buildActiveFilters() {
     final activeFilters = <String>[];
-    if (_selectedGender != 'ALL') activeFilters.add(_selectedGender);
-    if (_selectedAgeRange != 'ALL') activeFilters.add(_selectedAgeRange);
-    if (_selectedSortBy != 'RECENT')
-      activeFilters.add('Sort: $_selectedSortBy');
+
+    if (_currentFilters != null) {
+      if (_currentFilters!['gender'] != 'ALL') {
+        activeFilters.add(_currentFilters!['gender']);
+      }
+      if (_currentFilters!['onlineOnly'] == true) {
+        activeFilters.add('Online Only');
+      }
+      if (_currentFilters!['withPhotos'] == true) {
+        activeFilters.add('With Photos');
+      }
+      if (_currentFilters!['verifiedOnly'] == true) {
+        activeFilters.add('Verified Only');
+      }
+    }
 
     if (activeFilters.isEmpty) return const SizedBox.shrink();
 
@@ -260,7 +249,12 @@ class _ProfileBrowseScreenState extends State<ProfileBrowseScreen> {
                 labelStyle: const TextStyle(color: Color(0xFF2E7D32)),
                 deleteIcon:
                     const Icon(Icons.close, size: 16, color: Color(0xFF2E7D32)),
-                onDeleted: () => _resetFilters(),
+                onDeleted: () {
+                  setState(() {
+                    _currentFilters = null;
+                  });
+                  _loadProfiles(refresh: true);
+                },
               )),
         ],
       ),
@@ -328,7 +322,12 @@ class _ProfileBrowseScreenState extends State<ProfileBrowseScreen> {
           ),
           const SizedBox(height: 16),
           ElevatedButton(
-            onPressed: _resetFilters,
+            onPressed: () {
+              setState(() {
+                _currentFilters = null;
+              });
+              _loadProfiles(refresh: true);
+            },
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF2E7D32),
             ),
@@ -455,118 +454,6 @@ class _ProfileBrowseScreenState extends State<ProfileBrowseScreen> {
                 ),
                 child: const Text('Load More'),
               ),
-      ),
-    );
-  }
-
-  void _showFilterDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Filter Profiles'),
-        content: StatefulBuilder(
-          builder: (context, setState) => Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Gender Filter
-              const Text('Gender',
-                  style: TextStyle(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
-              DropdownButtonFormField<String>(
-                value: _selectedGender,
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                  contentPadding:
-                      EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                ),
-                items: _genderOptions.map((gender) {
-                  return DropdownMenuItem(
-                    value: gender,
-                    child: Text(gender == 'ALL' ? 'All Genders' : gender),
-                  );
-                }).toList(),
-                onChanged: (value) {
-                  setState(() {
-                    _selectedGender = value!;
-                  });
-                },
-              ),
-              const SizedBox(height: 16),
-
-              // Age Range Filter
-              const Text('Age Range',
-                  style: TextStyle(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
-              DropdownButtonFormField<String>(
-                value: _selectedAgeRange,
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                  contentPadding:
-                      EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                ),
-                items: _ageRangeOptions.map((range) {
-                  return DropdownMenuItem(
-                    value: range,
-                    child: Text(range == 'ALL' ? 'All Ages' : range),
-                  );
-                }).toList(),
-                onChanged: (value) {
-                  setState(() {
-                    _selectedAgeRange = value!;
-                  });
-                },
-              ),
-              const SizedBox(height: 16),
-
-              // Sort By Filter
-              const Text('Sort By',
-                  style: TextStyle(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
-              DropdownButtonFormField<String>(
-                value: _selectedSortBy,
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                  contentPadding:
-                      EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                ),
-                items: _sortOptions.map((sort) {
-                  return DropdownMenuItem(
-                    value: sort,
-                    child: Text(sort == 'RECENT' ? 'Most Recent' : sort),
-                  );
-                }).toList(),
-                onChanged: (value) {
-                  setState(() {
-                    _selectedSortBy = value!;
-                  });
-                },
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              _resetFilters();
-            },
-            child: const Text('Reset'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              _applyFilters();
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF2E7D32),
-            ),
-            child: const Text('Apply'),
-          ),
-        ],
       ),
     );
   }

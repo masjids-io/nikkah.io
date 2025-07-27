@@ -7,6 +7,7 @@ import 'screens/profile_creation_screen.dart';
 import 'screens/profile_view_screen.dart';
 import 'screens/profile_browse_screen.dart';
 import 'screens/main_navigation_screen.dart';
+import 'screens/filters_screen.dart';
 
 void main() {
   runApp(const MyApp());
@@ -48,6 +49,7 @@ class MyApp extends StatelessWidget {
         '/profile-creation': (context) => const ProfileCreationScreen(),
         '/profile-view': (context) => const ProfileViewScreen(),
         '/profile-browse': (context) => const ProfileBrowseScreen(),
+        '/filters': (context) => const FiltersScreen(),
         '/home': (context) => const MainNavigationScreen(),
       },
     );
