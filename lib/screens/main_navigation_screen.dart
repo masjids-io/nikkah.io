@@ -175,6 +175,7 @@ class ChatTab extends StatelessWidget {
 
     return ChatScreen(
       chatPartner: chatPartner,
+      conversationID: 'conversation-${chatPartner!['id'] ?? 'default'}',
     );
   }
 }

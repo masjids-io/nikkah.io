@@ -147,6 +147,8 @@ class _ProfileBrowseScreenState extends State<ProfileBrowseScreen> {
                 Navigator.of(context).pop();
                 if (widget.onStartChat != null) {
                   widget.onStartChat!({
+                    'id': profile['id'] ??
+                        'user-${DateTime.now().millisecondsSinceEpoch}',
                     'name': profile['name'] ?? 'Unknown',
                     'age': profile['age'] ?? 0,
                     'location': profile['location'] ?? 'Unknown',

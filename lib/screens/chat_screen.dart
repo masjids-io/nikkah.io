@@ -1,9 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../providers/chat_provider.dart';
+import '../models/message.dart';
 
 class ChatScreen extends StatefulWidget {
   final Map<String, dynamic>? chatPartner;
+  final String conversationID;
 
-  const ChatScreen({super.key, this.chatPartner});
+  const ChatScreen({
+    super.key,
+    this.chatPartner,
+    required this.conversationID,
+  });
 
   @override
   State<ChatScreen> createState() => _ChatScreenState();
@@ -12,13 +20,15 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> {
   final _messageController = TextEditingController();
   final _scrollController = ScrollController();
-  List<ChatMessage> _messages = [];
-  bool _isLoading = false;
+  bool _isTyping = false;
 
   @override
   void initState() {
     super.initState();
-    _loadMessages();
+    // Initialize chat when screen loads
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<ChatProvider>().initializeChat(widget.conversationID);
+    });
   }
 
   @override
@@ -26,66 +36,6 @@ class _ChatScreenState extends State<ChatScreen> {
     _messageController.dispose();
     _scrollController.dispose();
     super.dispose();
-  }
-
-  Future<void> _loadMessages() async {
-    setState(() {
-      _isLoading = true;
-    });
-
-    // Simulate loading messages
-    await Future.delayed(const Duration(seconds: 1));
-
-    // Sample messages for demonstration
-    final sampleMessages = [
-      ChatMessage(
-        id: '1',
-        text: 'Assalamu alaikum! How are you?',
-        isFromMe: false,
-        timestamp: DateTime.now().subtract(const Duration(hours: 2)),
-        status: MessageStatus.read,
-      ),
-      ChatMessage(
-        id: '2',
-        text: 'Wa alaikum assalam! I\'m doing well, thank you. How about you?',
-        isFromMe: true,
-        timestamp:
-            DateTime.now().subtract(const Duration(hours: 1, minutes: 45)),
-        status: MessageStatus.read,
-      ),
-      ChatMessage(
-        id: '3',
-        text: 'I\'m good too! I really enjoyed reading your profile.',
-        isFromMe: false,
-        timestamp:
-            DateTime.now().subtract(const Duration(hours: 1, minutes: 30)),
-        status: MessageStatus.read,
-      ),
-      ChatMessage(
-        id: '4',
-        text: 'Thank you! I found your profile very interesting as well.',
-        isFromMe: true,
-        timestamp: DateTime.now().subtract(const Duration(minutes: 30)),
-        status: MessageStatus.delivered,
-      ),
-      ChatMessage(
-        id: '5',
-        text: 'Would you like to know more about my family background?',
-        isFromMe: true,
-        timestamp: DateTime.now().subtract(const Duration(minutes: 15)),
-        status: MessageStatus.sent,
-      ),
-    ];
-
-    setState(() {
-      _messages = sampleMessages;
-      _isLoading = false;
-    });
-
-    // Scroll to bottom after loading
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _scrollToBottom();
-    });
   }
 
   void _scrollToBottom() {
@@ -102,87 +52,23 @@ class _ChatScreenState extends State<ChatScreen> {
     final text = _messageController.text.trim();
     if (text.isEmpty) return;
 
-    final newMessage = ChatMessage(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      text: text,
-      isFromMe: true,
-      timestamp: DateTime.now(),
-      status: MessageStatus.sending,
-    );
-
-    setState(() {
-      _messages.add(newMessage);
-    });
-
+    context.read<ChatProvider>().sendMessage(text);
     _messageController.clear();
-    _scrollToBottom();
 
-    // Simulate message delivery
-    Future.delayed(const Duration(seconds: 1), () {
-      setState(() {
-        final messageIndex = _messages.indexWhere((m) => m.id == newMessage.id);
-        if (messageIndex != -1) {
-          _messages[messageIndex] = _messages[messageIndex].copyWith(
-            status: MessageStatus.sent,
-          );
-        }
-      });
-    });
-
-    // Simulate message being delivered
-    Future.delayed(const Duration(seconds: 2), () {
-      setState(() {
-        final messageIndex = _messages.indexWhere((m) => m.id == newMessage.id);
-        if (messageIndex != -1) {
-          _messages[messageIndex] = _messages[messageIndex].copyWith(
-            status: MessageStatus.delivered,
-          );
-        }
-      });
-    });
-
-    // Simulate message being read
-    Future.delayed(const Duration(seconds: 3), () {
-      setState(() {
-        final messageIndex = _messages.indexWhere((m) => m.id == newMessage.id);
-        if (messageIndex != -1) {
-          _messages[messageIndex] = _messages[messageIndex].copyWith(
-            status: MessageStatus.read,
-          );
-        }
-      });
-    });
-
-    // Simulate reply after some time
-    Future.delayed(const Duration(seconds: 5), () {
-      if (mounted) {
-        final replyMessage = ChatMessage(
-          id: DateTime.now().millisecondsSinceEpoch.toString(),
-          text: _getRandomReply(),
-          isFromMe: false,
-          timestamp: DateTime.now(),
-          status: MessageStatus.read,
-        );
-
-        setState(() {
-          _messages.add(replyMessage);
-        });
-        _scrollToBottom();
-      }
+    // Scroll to bottom after sending
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _scrollToBottom();
     });
   }
 
-  String _getRandomReply() {
-    final replies = [
-      'That sounds great!',
-      'I would love to know more about that.',
-      'Thank you for sharing that with me.',
-      'That\'s very interesting!',
-      'I appreciate you telling me about that.',
-      'We seem to have a lot in common.',
-      'I\'m looking forward to learning more about you.',
-    ];
-    return replies[DateTime.now().millisecond % replies.length];
+  void _onTextChanged(String text) {
+    final chatProvider = context.read<ChatProvider>();
+    final isCurrentlyTyping = text.isNotEmpty;
+
+    if (isCurrentlyTyping != _isTyping) {
+      _isTyping = isCurrentlyTyping;
+      chatProvider.sendTypingIndicator(_isTyping);
+    }
   }
 
   @override
@@ -238,6 +124,20 @@ class _ChatScreenState extends State<ChatScreen> {
         backgroundColor: const Color(0xFF2E7D32),
         elevation: 0,
         actions: [
+          Consumer<ChatProvider>(
+            builder: (context, chatProvider, child) {
+              return Container(
+                margin: const EdgeInsets.only(right: 8),
+                child: Icon(
+                  chatProvider.isConnected
+                      ? Icons.circle
+                      : Icons.circle_outlined,
+                  color: chatProvider.isConnected ? Colors.green : Colors.red,
+                  size: 12,
+                ),
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.more_vert, color: Colors.white),
             onPressed: _showChatOptions,
@@ -245,25 +145,78 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
         ],
       ),
-      body: Column(
-        children: [
-          // Messages List
-          Expanded(
-            child: _isLoading
-                ? const Center(
-                    child: CircularProgressIndicator(
-                      valueColor:
-                          AlwaysStoppedAnimation<Color>(Color(0xFF2E7D32)),
-                    ),
-                  )
-                : _messages.isEmpty
-                    ? _buildEmptyState()
-                    : _buildMessagesList(),
-          ),
+      body: Consumer<ChatProvider>(
+        builder: (context, chatProvider, child) {
+          return Column(
+            children: [
+              // Connection status
+              if (chatProvider.error != null)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(8),
+                  color: Colors.red.shade100,
+                  child: Row(
+                    children: [
+                      Icon(Icons.error, color: Colors.red.shade700, size: 16),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          chatProvider.error!,
+                          style: TextStyle(
+                            color: Colors.red.shade700,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        icon: Icon(Icons.close,
+                            color: Colors.red.shade700, size: 16),
+                        onPressed: chatProvider.clearError,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                      ),
+                    ],
+                  ),
+                ),
 
-          // Message Input
-          _buildMessageInput(),
-        ],
+              // Messages List
+              Expanded(
+                child: chatProvider.isLoading
+                    ? const Center(
+                        child: CircularProgressIndicator(
+                          valueColor:
+                              AlwaysStoppedAnimation<Color>(Color(0xFF2E7D32)),
+                        ),
+                      )
+                    : chatProvider.messages.isEmpty
+                        ? _buildEmptyState()
+                        : _buildMessagesList(chatProvider),
+              ),
+
+              // Typing indicator
+              if (chatProvider.isTyping)
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: Row(
+                    children: [
+                      Text(
+                        '${chatPartner['name']} is typing...',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey.shade600,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+              // Message Input
+              _buildMessageInput(),
+            ],
+          );
+        },
       ),
     );
   }
@@ -300,20 +253,21 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  Widget _buildMessagesList() {
+  Widget _buildMessagesList(ChatProvider chatProvider) {
     return ListView.builder(
       controller: _scrollController,
       padding: const EdgeInsets.all(16),
-      itemCount: _messages.length,
+      itemCount: chatProvider.messages.length,
       itemBuilder: (context, index) {
-        final message = _messages[index];
+        final message = chatProvider.messages[index];
         final showDate = index == 0 ||
-            !_isSameDay(message.timestamp, _messages[index - 1].timestamp);
+            !_isSameDay(
+                message.timestamp, chatProvider.messages[index - 1].timestamp);
 
         return Column(
           children: [
             if (showDate) _buildDateDivider(message.timestamp),
-            _buildMessageBubble(message),
+            _buildMessageBubble(message, chatProvider),
             const SizedBox(height: 8),
           ],
         );
@@ -344,38 +298,37 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  Widget _buildMessageBubble(ChatMessage message) {
+  Widget _buildMessageBubble(Message message, ChatProvider chatProvider) {
+    final isFromMe = message.senderID == chatProvider.currentUserID;
+
     return Align(
-      alignment:
-          message.isFromMe ? Alignment.centerRight : Alignment.centerLeft,
+      alignment: isFromMe ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
         constraints: BoxConstraints(
           maxWidth: MediaQuery.of(context).size.width * 0.75,
         ),
         child: Column(
-          crossAxisAlignment: message.isFromMe
-              ? CrossAxisAlignment.end
-              : CrossAxisAlignment.start,
+          crossAxisAlignment:
+              isFromMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
           children: [
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
-                color: message.isFromMe
-                    ? const Color(0xFF2E7D32)
-                    : Colors.grey.shade200,
+                color:
+                    isFromMe ? const Color(0xFF2E7D32) : Colors.grey.shade200,
                 borderRadius: BorderRadius.circular(18).copyWith(
-                  bottomLeft: message.isFromMe
+                  bottomLeft: isFromMe
                       ? const Radius.circular(18)
                       : const Radius.circular(4),
-                  bottomRight: message.isFromMe
+                  bottomRight: isFromMe
                       ? const Radius.circular(4)
                       : const Radius.circular(18),
                 ),
               ),
               child: Text(
-                message.text,
+                message.content,
                 style: TextStyle(
-                  color: message.isFromMe ? Colors.white : Colors.black87,
+                  color: isFromMe ? Colors.white : Colors.black87,
                   fontSize: 16,
                 ),
               ),
@@ -391,9 +344,9 @@ class _ChatScreenState extends State<ChatScreen> {
                     color: Colors.grey.shade600,
                   ),
                 ),
-                if (message.isFromMe) ...[
+                if (isFromMe) ...[
                   const SizedBox(width: 4),
-                  _buildMessageStatus(message.status),
+                  _buildMessageStatus(message.isRead),
                 ],
               ],
             ),
@@ -403,33 +356,11 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  Widget _buildMessageStatus(MessageStatus status) {
-    IconData icon;
-    Color color;
-
-    switch (status) {
-      case MessageStatus.sending:
-        icon = Icons.schedule;
-        color = Colors.grey;
-        break;
-      case MessageStatus.sent:
-        icon = Icons.check;
-        color = Colors.grey;
-        break;
-      case MessageStatus.delivered:
-        icon = Icons.done_all;
-        color = Colors.grey;
-        break;
-      case MessageStatus.read:
-        icon = Icons.done_all;
-        color = const Color(0xFF2E7D32);
-        break;
-    }
-
+  Widget _buildMessageStatus(bool isRead) {
     return Icon(
-      icon,
+      isRead ? Icons.done_all : Icons.done,
       size: 16,
-      color: color,
+      color: isRead ? const Color(0xFF2E7D32) : Colors.grey,
     );
   }
 
@@ -466,6 +397,7 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
               maxLines: null,
               textCapitalization: TextCapitalization.sentences,
+              onChanged: _onTextChanged,
               onSubmitted: (_) => _sendMessage(),
             ),
           ),
@@ -499,7 +431,6 @@ class _ChatScreenState extends State<ChatScreen> {
               title: const Text('View Profile'),
               onTap: () {
                 Navigator.of(context).pop();
-                // Navigate to profile view
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('View Profile coming soon!')),
                 );
@@ -552,7 +483,7 @@ class _ChatScreenState extends State<ChatScreen> {
           ElevatedButton(
             onPressed: () {
               Navigator.of(context).pop();
-              Navigator.of(context).pop(); // Go back to previous screen
+              Navigator.of(context).pop();
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
                   content: Text('User blocked successfully'),
@@ -583,7 +514,7 @@ class _ChatScreenState extends State<ChatScreen> {
           ElevatedButton(
             onPressed: () {
               Navigator.of(context).pop();
-              Navigator.of(context).pop(); // Go back to previous screen
+              Navigator.of(context).pop();
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
                   content: Text('Chat deleted successfully'),
@@ -622,43 +553,4 @@ class _ChatScreenState extends State<ChatScreen> {
   String _formatTime(DateTime time) {
     return '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
   }
-}
-
-class ChatMessage {
-  final String id;
-  final String text;
-  final bool isFromMe;
-  final DateTime timestamp;
-  final MessageStatus status;
-
-  ChatMessage({
-    required this.id,
-    required this.text,
-    required this.isFromMe,
-    required this.timestamp,
-    required this.status,
-  });
-
-  ChatMessage copyWith({
-    String? id,
-    String? text,
-    bool? isFromMe,
-    DateTime? timestamp,
-    MessageStatus? status,
-  }) {
-    return ChatMessage(
-      id: id ?? this.id,
-      text: text ?? this.text,
-      isFromMe: isFromMe ?? this.isFromMe,
-      timestamp: timestamp ?? this.timestamp,
-      status: status ?? this.status,
-    );
-  }
-}
-
-enum MessageStatus {
-  sending,
-  sent,
-  delivered,
-  read,
 }

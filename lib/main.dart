@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'splash_screen.dart';
 import 'intro_screen.dart';
 import 'screens/login_screen.dart';
@@ -9,6 +10,8 @@ import 'screens/profile_browse_screen.dart';
 import 'screens/main_navigation_screen.dart';
 import 'screens/filters_screen.dart';
 import 'screens/chat_screen.dart';
+import 'screens/conversation_list_screen.dart';
+import 'providers/chat_provider.dart';
 
 void main() {
   runApp(const MyApp());
@@ -20,40 +23,43 @@ class MyApp extends StatelessWidget {
   // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Nikkah.io',
-      theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // TRY THIS: Try running your application with "flutter run". You'll see
-        // the application has a blue toolbar. Then, without quitting the app,
-        // try changing the seedColor in the colorScheme below to Colors.green
-        // and then invoke "hot reload" (save your changes or press the "hot
-        // reload" button in a Flutter-supported IDE, or press "r" if you used
-        // the command line to start the app).
-        //
-        // Notice that the counter didn't reset back to zero; the application
-        // state is not lost during the reload. To reset the state, use hot
-        // restart instead.
-        //
-        // This works for code too, not just values: Most code changes can be
-        // tested with just a hot reload.
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.green),
-        useMaterial3: true,
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => ChatProvider()),
+      ],
+      child: MaterialApp(
+        title: 'Nikkah.io',
+        theme: ThemeData(
+          colorScheme: ColorScheme.fromSeed(seedColor: Colors.green),
+          useMaterial3: true,
+        ),
+        initialRoute: '/',
+        routes: {
+          '/': (context) => const SplashScreen(),
+          '/intro': (context) => const IntroScreen(),
+          '/login': (context) => const LoginScreen(),
+          '/register': (context) => const RegisterScreen(),
+          '/profile-creation': (context) => const ProfileCreationScreen(),
+          '/profile-view': (context) => const ProfileViewScreen(),
+          '/profile-browse': (context) => const ProfileBrowseScreen(),
+          '/filters': (context) => const FiltersScreen(),
+          '/conversations': (context) => const ConversationListScreen(),
+          '/home': (context) => const MainNavigationScreen(),
+        },
+        onGenerateRoute: (settings) {
+          if (settings.name == '/chat') {
+            final args = settings.arguments as Map<String, dynamic>?;
+            return MaterialPageRoute(
+              builder: (context) => ChatScreen(
+                chatPartner: args?['chatPartner'],
+                conversationID:
+                    args?['conversationID'] ?? 'default-conversation',
+              ),
+            );
+          }
+          return null;
+        },
       ),
-      initialRoute: '/',
-      routes: {
-        '/': (context) => const SplashScreen(),
-        '/intro': (context) => const IntroScreen(),
-        '/login': (context) => const LoginScreen(),
-        '/register': (context) => const RegisterScreen(),
-        '/profile-creation': (context) => const ProfileCreationScreen(),
-        '/profile-view': (context) => const ProfileViewScreen(),
-        '/profile-browse': (context) => const ProfileBrowseScreen(),
-        '/filters': (context) => const FiltersScreen(),
-        '/chat': (context) => const ChatScreen(),
-        '/home': (context) => const MainNavigationScreen(),
-      },
     );
   }
 }

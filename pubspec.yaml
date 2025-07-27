@@ -42,6 +42,12 @@ dependencies:
   # HTTP client for REST API calls
   http: ^1.1.0
   
+  # WebSocket support
+  web_socket_channel: ^2.4.0
+  
+  # UUID support
+  uuid: ^4.2.1
+  
   # State management
   provider: ^6.1.1
   

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:provider/provider.dart';
 import 'package:nikkah_io/screens/chat_screen.dart';
+import 'package:nikkah_io/providers/chat_provider.dart';
 
 void main() {
   group('ChatScreen', () {
@@ -14,7 +16,13 @@ void main() {
 
       await tester.pumpWidget(
         MaterialApp(
-          home: ChatScreen(chatPartner: chatPartner),
+          home: ChangeNotifierProvider(
+            create: (_) => ChatProvider(),
+            child: ChatScreen(
+              chatPartner: chatPartner,
+              conversationID: 'test-conversation-1',
+            ),
+          ),
         ),
       );
 
@@ -36,7 +44,13 @@ void main() {
 
       await tester.pumpWidget(
         MaterialApp(
-          home: ChatScreen(chatPartner: chatPartner),
+          home: ChangeNotifierProvider(
+            create: (_) => ChatProvider(),
+            child: ChatScreen(
+              chatPartner: chatPartner,
+              conversationID: 'test-conversation-2',
+            ),
+          ),
         ),
       );
 
@@ -52,8 +66,11 @@ void main() {
     testWidgets('displays chat interface when no partner provided',
         (WidgetTester tester) async {
       await tester.pumpWidget(
-        const MaterialApp(
-          home: ChatScreen(),
+        MaterialApp(
+          home: ChangeNotifierProvider(
+            create: (_) => ChatProvider(),
+            child: const ChatScreen(conversationID: 'test-conversation-3'),
+          ),
         ),
       );
 
