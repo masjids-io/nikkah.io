@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'splash_screen.dart';
 
 void main() {
   runApp(const MyApp());
@@ -31,7 +32,12 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.green),
         useMaterial3: true,
       ),
-      home: const MyHomePage(title: 'Nikkah.io - Muslim Matrimonial App'),
+      initialRoute: '/',
+      routes: {
+        '/': (context) => const SplashScreen(),
+        '/home': (context) =>
+            const MyHomePage(title: 'Nikkah.io - Muslim Matrimonial App'),
+      },
     );
   }
 }
