@@ -104,32 +104,20 @@ void main() {
       expect(find.byType(Container), findsWidgets);
     });
 
-    testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-      // Build our app and trigger a frame.
-      await tester.pumpWidget(const MyApp());
-
-      // Wait for splash screen to complete
-      await tester.pumpAndSettle(const Duration(seconds: 4));
-
-      // Skip intro by tapping skip button
-      await tester.tap(find.text('Skip'));
-      await tester.pumpAndSettle();
-
-      // Navigate to home screen (bypassing auth for test)
+    testWidgets('Home screen displays correctly', (WidgetTester tester) async {
+      // Build home screen directly
       await tester.pumpWidget(const MaterialApp(
           home: MyHomePage(title: 'Nikkah.io - Muslim Matrimonial App')));
 
-      // Verify that our counter starts at 0.
-      expect(find.text('0'), findsOneWidget);
-      expect(find.text('1'), findsNothing);
-
-      // Tap the '+' icon and trigger a frame.
-      await tester.tap(find.byIcon(Icons.add));
-      await tester.pump();
-
-      // Verify that our counter has incremented.
-      expect(find.text('0'), findsNothing);
-      expect(find.text('1'), findsOneWidget);
+      // Verify that home screen elements are present
+      expect(find.text('Welcome to Nikkah.io'), findsOneWidget);
+      expect(find.text('Your journey to finding your soulmate starts here'),
+          findsOneWidget);
+      expect(find.text('Quick Actions'), findsOneWidget);
+      expect(find.text('Create Profile'), findsOneWidget);
+      expect(find.text('My Profile'), findsOneWidget);
+      expect(find.text('Browse Profiles'), findsOneWidget);
+      expect(find.text('Logout'), findsOneWidget);
     });
   });
 }
