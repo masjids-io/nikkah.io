@@ -19,7 +19,7 @@ void main() {
     testWidgets('Splash screen displays correctly',
         (WidgetTester tester) async {
       // Build our app and trigger a frame.
-      await tester.pumpWidget(const MyApp());
+      await tester.pumpWidget(const NikkahApp());
 
       // Verify that splash screen elements are present
       expect(find.text('Nikkah.io'), findsOneWidget);
@@ -39,7 +39,7 @@ void main() {
     testWidgets('Splash screen navigates to intro after delay',
         (WidgetTester tester) async {
       // Build our app and trigger a frame.
-      await tester.pumpWidget(const MyApp());
+      await tester.pumpWidget(const NikkahApp());
 
       // Initially, we should see splash screen
       expect(find.text('Nikkah.io'), findsOneWidget);

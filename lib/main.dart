@@ -14,11 +14,11 @@ import 'screens/conversation_list_screen.dart';
 import 'providers/chat_provider.dart';
 
 void main() {
-  runApp(const MyApp());
+  runApp(const NikkahApp());
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+class NikkahApp extends StatelessWidget {
+  const NikkahApp({super.key});
 
   // This widget is the root of your application.
   @override

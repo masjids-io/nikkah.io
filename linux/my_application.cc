@@ -7,16 +7,16 @@
 
 #include "flutter/generated_plugin_registrant.h"
 
-struct _MyApplication {
+struct _NikkahApplication {
   GtkApplication parent_instance;
   char** dart_entrypoint_arguments;
 };
 
-G_DEFINE_TYPE(MyApplication, my_application, GTK_TYPE_APPLICATION)
+G_DEFINE_TYPE(NikkahApplication, nikkah_application, GTK_TYPE_APPLICATION)
 
 // Implements GApplication::activate.
-static void my_application_activate(GApplication* application) {
-  MyApplication* self = MY_APPLICATION(application);
+static void nikkah_application_activate(GApplication* application) {
+  NikkahApplication* self = NIKKAH_APPLICATION(application);
   GtkWindow* window =
       GTK_WINDOW(gtk_application_window_new(GTK_APPLICATION(application)));
 
@@ -40,11 +40,11 @@ static void my_application_activate(GApplication* application) {
   if (use_header_bar) {
     GtkHeaderBar* header_bar = GTK_HEADER_BAR(gtk_header_bar_new());
     gtk_widget_show(GTK_WIDGET(header_bar));
-    gtk_header_bar_set_title(header_bar, "myapp");
+    gtk_header_bar_set_title(header_bar, "Nikkah.io");
     gtk_header_bar_set_show_close_button(header_bar, TRUE);
     gtk_window_set_titlebar(window, GTK_WIDGET(header_bar));
   } else {
-    gtk_window_set_title(window, "myapp");
+    gtk_window_set_title(window, "Nikkah.io");
   }
 
   gtk_window_set_default_size(window, 1280, 720);
@@ -63,8 +63,8 @@ static void my_application_activate(GApplication* application) {
 }
 
 // Implements GApplication::local_command_line.
-static gboolean my_application_local_command_line(GApplication* application, gchar*** arguments, int* exit_status) {
-  MyApplication* self = MY_APPLICATION(application);
+static gboolean nikkah_application_local_command_line(GApplication* application, gchar*** arguments, int* exit_status) {
+  NikkahApplication* self = NIKKAH_APPLICATION(application);
   // Strip out the first argument as it is the binary name.
   self->dart_entrypoint_arguments = g_strdupv(*arguments + 1);
 
@@ -82,10 +82,10 @@ static gboolean my_application_local_command_line(GApplication* application, gch
 }
 
 // Implements GObject::dispose.
-static void my_application_dispose(GObject* object) {
-  MyApplication* self = MY_APPLICATION(object);
+static void nikkah_application_dispose(GObject* object) {
+  NikkahApplication* self = NIKKAH_APPLICATION(object);
   g_clear_pointer(&self->dart_entrypoint_arguments, g_strfreev);
-  G_OBJECT_CLASS(my_application_parent_class)->dispose(object);
+  G_OBJECT_CLASS(nikkah_application_parent_class)->dispose(object);
 }
 
 static void my_application_class_init(MyApplicationClass* klass) {
