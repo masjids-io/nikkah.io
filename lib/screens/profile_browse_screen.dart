@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/profile_service.dart';
+import '../models/nikkah_profile.dart';
 
 class ProfileBrowseScreen extends StatefulWidget {
   final Function(Map<String, dynamic>)? onStartChat;
@@ -19,8 +20,9 @@ class _ProfileBrowseScreenState extends State<ProfileBrowseScreen> {
   bool _isLoading = true;
   bool _isLoadingMore = false;
   String? _errorMessage;
-  List<Map<String, dynamic>> _profiles = [];
-  String? _nextPageToken;
+  List<NikkahProfile> _profiles = [];
+  int _currentPage = 1;
+  int _totalPages = 1;
   bool _hasMoreProfiles = true;
 
   // Search controller
@@ -47,7 +49,7 @@ class _ProfileBrowseScreenState extends State<ProfileBrowseScreen> {
         setState(() {
           _isLoading = true;
           _profiles = [];
-          _nextPageToken = null;
+          _currentPage = 1;
           _hasMoreProfiles = true;
         });
       } else {
@@ -58,23 +60,62 @@ class _ProfileBrowseScreenState extends State<ProfileBrowseScreen> {
 
       _errorMessage = null;
 
+      // Build query parameters based on filters
+      final queryParams = <String, dynamic>{
+        'page': refresh ? 1 : _currentPage + 1,
+        'limit': 10,
+      };
+
+      // Add search term if provided
+      if (_searchController.text.isNotEmpty) {
+        queryParams['name'] = _searchController.text;
+      }
+
+      // Add filters if provided
+      if (_currentFilters != null) {
+        if (_currentFilters!['gender'] != null &&
+            _currentFilters!['gender'] != 'ALL') {
+          queryParams['gender'] = _currentFilters!['gender'];
+        }
+        if (_currentFilters!['location'] != null &&
+            _currentFilters!['location'].isNotEmpty) {
+          queryParams['location.city'] = _currentFilters!['location'];
+        }
+        if (_currentFilters!['education'] != null &&
+            _currentFilters!['education'] != 'ALL') {
+          queryParams['education'] = _currentFilters!['education'];
+        }
+        if (_currentFilters!['sect'] != null &&
+            _currentFilters!['sect'] != 'ALL') {
+          queryParams['sect'] = _currentFilters!['sect'];
+        }
+      }
+
       // Call the API to get profiles
       final response = await ProfileService.listNikkahProfiles(
-        pageSize: 10,
-        pageToken: refresh ? null : _nextPageToken,
+        start: queryParams['start'],
+        limit: queryParams['limit'],
+        page: queryParams['page'],
+        name: queryParams['name'],
+        gender: queryParams['gender'],
+        city: queryParams['location.city'],
+        education: queryParams['education'],
+        sect: queryParams['sect'],
       );
 
-      final profiles = response['profiles'] as List<dynamic>? ?? [];
-      final nextPageToken = response['next_page_token'] as String?;
+      final profiles = response.listProfilesResponse?.profiles ?? [];
+      final totalPages = response.listProfilesResponse?.totalPages ?? 1;
+      final currentPage = response.listProfilesResponse?.currentPage ?? 1;
 
       setState(() {
         if (refresh) {
-          _profiles = profiles.cast<Map<String, dynamic>>();
+          _profiles = profiles;
         } else {
-          _profiles.addAll(profiles.cast<Map<String, dynamic>>());
+          _profiles.addAll(profiles);
         }
-        _nextPageToken = nextPageToken;
-        _hasMoreProfiles = nextPageToken != null;
+        _currentPage = currentPage;
+        _totalPages = totalPages;
+        _hasMoreProfiles = currentPage < totalPages;
         _isLoading = false;
         _isLoadingMore = false;
       });
@@ -88,8 +129,6 @@ class _ProfileBrowseScreenState extends State<ProfileBrowseScreen> {
   }
 
   Future<void> _searchProfiles() async {
-    // In a real app, this would call a search API
-    // For now, we'll just reload profiles
     await _loadProfiles(refresh: true);
   }
 
@@ -104,7 +143,7 @@ class _ProfileBrowseScreenState extends State<ProfileBrowseScreen> {
     }
   }
 
-  void _viewProfile(Map<String, dynamic> profile) {
+  void _viewProfile(NikkahProfile profile) {
     // Check if there's an active chat
     if (widget.hasActiveChat) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -128,30 +167,37 @@ class _ProfileBrowseScreenState extends State<ProfileBrowseScreen> {
             ListTile(
               leading: const Icon(Icons.person, color: Color(0xFF2E7D32)),
               title: const Text('View Profile'),
-              subtitle: Text('See ${profile['name']}\'s full profile'),
+              subtitle: Text('See ${profile.name}\'s full profile'),
               onTap: () {
                 Navigator.of(context).pop();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Viewing ${profile['name']}\'s profile'),
-                    duration: const Duration(seconds: 2),
-                  ),
+                Navigator.of(context).pushNamed(
+                  '/profile-view',
+                  arguments: profile,
                 );
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.favorite, color: Color(0xFF2E7D32)),
+              title: const Text('Like Profile'),
+              subtitle: Text('Show interest in ${profile.name}'),
+              onTap: () {
+                Navigator.of(context).pop();
+                _likeProfile(profile);
               },
             ),
             ListTile(
               leading: const Icon(Icons.chat, color: Color(0xFF2E7D32)),
               title: const Text('Start Chat'),
-              subtitle: Text('Begin chatting with ${profile['name']}'),
+              subtitle: Text('Begin chatting with ${profile.name}'),
               onTap: () {
                 Navigator.of(context).pop();
                 if (widget.onStartChat != null) {
                   widget.onStartChat!({
-                    'id': profile['id'] ??
+                    'id': profile.id ??
                         'user-${DateTime.now().millisecondsSinceEpoch}',
-                    'name': profile['name'] ?? 'Unknown',
-                    'age': profile['age'] ?? 0,
-                    'location': profile['location'] ?? 'Unknown',
+                    'name': profile.name ?? 'Unknown',
+                    'age': profile.age ?? 0,
+                    'location': profile.location?.displayLocation ?? 'Unknown',
                   });
                 }
               },
@@ -160,6 +206,44 @@ class _ProfileBrowseScreenState extends State<ProfileBrowseScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _likeProfile(NikkahProfile profile) async {
+    try {
+      // Get current user's profile first
+      final selfProfileResponse = await ProfileService.getSelfNikkahProfile();
+      final selfProfile = selfProfileResponse.nikkahProfile;
+
+      if (selfProfile == null) {
+        throw Exception('Unable to get your profile');
+      }
+
+      // Create like data
+      final likeData = {
+        'likerProfileId': selfProfile.id,
+        'likedProfileId': profile.id,
+      };
+
+      final response = await ProfileService.initiateNikkahLike(likeData);
+
+      if (response.code == '200' || response.status == 'success') {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('You liked ${profile.name}\'s profile!'),
+            backgroundColor: const Color(0xFF2E7D32),
+          ),
+        );
+      } else {
+        throw Exception(response.message ?? 'Failed to like profile');
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   @override
@@ -276,17 +360,21 @@ class _ProfileBrowseScreenState extends State<ProfileBrowseScreen> {
     final activeFilters = <String>[];
 
     if (_currentFilters != null) {
-      if (_currentFilters!['gender'] != 'ALL') {
+      if (_currentFilters!['gender'] != null &&
+          _currentFilters!['gender'] != 'ALL') {
         activeFilters.add(_currentFilters!['gender']);
       }
-      if (_currentFilters!['onlineOnly'] == true) {
-        activeFilters.add('Online Only');
+      if (_currentFilters!['location'] != null &&
+          _currentFilters!['location'].isNotEmpty) {
+        activeFilters.add('Location: ${_currentFilters!['location']}');
       }
-      if (_currentFilters!['withPhotos'] == true) {
-        activeFilters.add('With Photos');
+      if (_currentFilters!['education'] != null &&
+          _currentFilters!['education'] != 'ALL') {
+        activeFilters.add('Education: ${_currentFilters!['education']}');
       }
-      if (_currentFilters!['verifiedOnly'] == true) {
-        activeFilters.add('Verified Only');
+      if (_currentFilters!['sect'] != null &&
+          _currentFilters!['sect'] != 'ALL') {
+        activeFilters.add('Sect: ${_currentFilters!['sect']}');
       }
     }
 
@@ -408,14 +496,15 @@ class _ProfileBrowseScreenState extends State<ProfileBrowseScreen> {
     );
   }
 
-  Widget _buildProfileCard(Map<String, dynamic> profile) {
-    final name = profile['name'] as String? ?? 'Unknown';
-    final gender = profile['gender'] as String? ?? 'UNSPECIFIED';
-    final birthDate = profile['birth_date'] ?? profile['birthDate'];
-    final age = birthDate != null
-        ? DateTime.now().year - (birthDate['year'] as int)
-        : 'Unknown';
-    final profileId = profile['profile_id'] ?? profile['profileId'] ?? 'N/A';
+  Widget _buildProfileCard(NikkahProfile profile) {
+    final name = profile.name ?? 'Unknown';
+    final gender = profile.gender ?? 'GENDER_UNSPECIFIED';
+    final age = profile.age;
+    final ageText = age != null ? '$age years old' : 'Age not specified';
+    final location =
+        profile.location?.displayLocation ?? 'Location not specified';
+    final education = profile.education ?? 'Education not specified';
+    final occupation = profile.occupation ?? 'Occupation not specified';
 
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
@@ -459,7 +548,7 @@ class _ProfileBrowseScreenState extends State<ProfileBrowseScreen> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '$age years old • ${gender == 'MALE' ? 'Male' : 'Female'}',
+                      '$ageText • ${gender == 'MALE' ? 'Male' : 'Female'}',
                       style: const TextStyle(
                         fontSize: 14,
                         color: Colors.grey,
@@ -467,11 +556,18 @@ class _ProfileBrowseScreenState extends State<ProfileBrowseScreen> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'ID: $profileId',
+                      location,
                       style: const TextStyle(
                         fontSize: 12,
                         color: Colors.grey,
-                        fontFamily: 'monospace',
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '$education • $occupation',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey,
                       ),
                     ),
                   ],
