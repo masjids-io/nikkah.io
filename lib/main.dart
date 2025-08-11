@@ -40,7 +40,6 @@ class MyApp extends StatelessWidget {
           '/login': (context) => const LoginScreen(),
           '/register': (context) => const RegisterScreen(),
           '/profile-creation': (context) => const ProfileCreationScreen(),
-          '/profile-view': (context) => const ProfileViewScreen(),
           '/profile-browse': (context) => const ProfileBrowseScreen(),
           '/filters': (context) => const FiltersScreen(),
           '/conversations': (context) => const ConversationListScreen(),
@@ -56,6 +55,15 @@ class MyApp extends StatelessWidget {
                     args?['conversationID'] ?? 'default-conversation',
               ),
             );
+          }
+          if (settings.name == '/profile-view') {
+            final args = settings.arguments as Map<String, dynamic>?;
+            final profile = args?['profile'];
+            if (profile != null) {
+              return MaterialPageRoute(
+                builder: (context) => ProfileViewScreen(profile: profile),
+              );
+            }
           }
           return null;
         },
