@@ -57,6 +57,9 @@ dependencies:
   # Secure storage for tokens
   flutter_secure_storage: ^9.0.0
   
+  # Cryptography for security
+  crypto: ^3.0.3
+  
   # Testing dependencies
   mockito: ^5.4.4
   build_runner: ^2.4.7
