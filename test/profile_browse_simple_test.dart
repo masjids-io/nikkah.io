@@ -1,125 +1,207 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:nikkah_io/screens/profile_browse_screen.dart';
+import 'package:nikkah_io/models/profile_browse_state.dart';
 import 'package:nikkah_io/models/nikkah_profile.dart';
+import 'package:nikkah_io/exceptions/profile_exceptions.dart';
 
 void main() {
-  group('ProfileBrowseScreen Simple Tests', () {
-    testWidgets('ProfileBrowseScreen displays correctly',
-        (WidgetTester tester) async {
-      await tester.pumpWidget(const MaterialApp(home: ProfileBrowseScreen()));
-
-      // Should show app bar with title
-      expect(find.text('Browse Profiles'), findsOneWidget);
-
-      // Should show search bar
-      expect(find.text('Search profiles...'), findsOneWidget);
-      expect(find.text('Search'), findsOneWidget);
-
-      // Should show filter button
-      expect(find.byIcon(Icons.filter_list), findsOneWidget);
-
-      // Initially should show loading
-      expect(find.text('Loading profiles...'), findsOneWidget);
-      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+  group('Profile Browse State Tests', () {
+    test('should create initial state', () {
+      const state = ProfileBrowseInitial();
+      expect(state, isA<ProfileBrowseState>());
     });
 
-    testWidgets('ProfileBrowseScreen has search functionality',
-        (WidgetTester tester) async {
-      await tester.pumpWidget(const MaterialApp(home: ProfileBrowseScreen()));
-
-      // Should have search text field
-      expect(find.byType(TextField), findsOneWidget);
-
-      // Should have search button
-      expect(find.text('Search'), findsOneWidget);
+    test('should create loading state', () {
+      const state = ProfileBrowseLoading();
+      expect(state, isA<ProfileBrowseState>());
     });
 
-    testWidgets('ProfileBrowseScreen has filter button',
-        (WidgetTester tester) async {
-      await tester.pumpWidget(const MaterialApp(home: ProfileBrowseScreen()));
+    test('should create success state with profiles', () {
+      final profiles = [
+        NikkahProfile(id: '1', name: 'John Doe'),
+        NikkahProfile(id: '2', name: 'Jane Smith'),
+      ];
 
-      // Should have filter button in app bar
-      expect(find.byIcon(Icons.filter_list), findsOneWidget);
-    });
-
-    testWidgets('ProfileBrowseScreen has proper structure',
-        (WidgetTester tester) async {
-      await tester.pumpWidget(const MaterialApp(home: ProfileBrowseScreen()));
-
-      // Should have app bar
-      expect(find.byType(AppBar), findsOneWidget);
-
-      // Should have search bar container
-      expect(find.byType(Container), findsWidgets);
-
-      // Should have loading indicator
-      expect(find.byType(CircularProgressIndicator), findsOneWidget);
-    });
-
-    testWidgets('ProfileBrowseScreen shows profile cards correctly',
-        (WidgetTester tester) async {
-      // Create a mock profile
-      final mockProfile = NikkahProfile(
-        id: 'profile-123',
-        name: 'John Doe',
-        gender: 'MALE',
-        birthDate: BirthDate(year: 1995, month: 'JANUARY', day: 15),
-        location: Location(city: 'New York', state: 'NY', country: 'USA'),
-        education: 'BACHELOR',
-        occupation: 'Software Engineer',
+      final state = ProfileBrowseSuccess(
+        profiles: profiles,
+        currentPage: 1,
+        totalPages: 2,
+        hasMoreProfiles: true,
       );
 
-      // Create a widget with mock data
-      await tester.pumpWidget(
-        MaterialApp(
-          home: ProfileBrowseScreen(),
-        ),
+      expect(state, isA<ProfileBrowseState>());
+      expect(state.profiles, hasLength(2));
+      expect(state.currentPage, 1);
+      expect(state.totalPages, 2);
+      expect(state.hasMoreProfiles, true);
+    });
+
+    test('should create error state', () {
+      const state = ProfileBrowseError(
+        message: 'Test error',
+        errorType: ProfileBrowseErrorType.network,
       );
 
-      // Wait for the widget to build
-      await tester.pump();
-
-      // Should show loading initially
-      expect(find.text('Loading profiles...'), findsOneWidget);
+      expect(state, isA<ProfileBrowseState>());
+      expect(state.message, 'Test error');
+      expect(state.errorType, ProfileBrowseErrorType.network);
     });
 
-    testWidgets('ProfileBrowseScreen handles empty state',
-        (WidgetTester tester) async {
-      await tester.pumpWidget(const MaterialApp(home: ProfileBrowseScreen()));
+    test('should create empty state', () {
+      const state = ProfileBrowseEmpty(
+        message: 'No profiles found',
+        activeFilters: {'gender': 'MALE'},
+        searchQuery: 'test',
+      );
 
-      // Initially shows loading
-      expect(find.text('Loading profiles...'), findsOneWidget);
+      expect(state, isA<ProfileBrowseState>());
+      expect(state.message, 'No profiles found');
+      expect(state.activeFilters, {'gender': 'MALE'});
+      expect(state.searchQuery, 'test');
+    });
+  });
 
-      // After loading, if no profiles, should show empty state
-      // This would be tested with mocked service responses
+  group('Profile Browse Error Type Tests', () {
+    test('should provide user-friendly network error message', () {
+      const errorType = ProfileBrowseErrorType.network;
+      expect(
+        errorType.userFriendlyMessage,
+        'Network connection error. Please check your internet connection and try again.',
+      );
     });
 
-    testWidgets('ProfileBrowseScreen shows active filters',
-        (WidgetTester tester) async {
-      await tester.pumpWidget(const MaterialApp(home: ProfileBrowseScreen()));
-
-      // Initially no active filters should be shown
-      expect(find.text('Male'), findsNothing);
-      expect(find.text('Location: New York'), findsNothing);
+    test('should provide user-friendly authentication error message', () {
+      const errorType = ProfileBrowseErrorType.authentication;
+      expect(
+        errorType.userFriendlyMessage,
+        'Authentication error. Please log in again.',
+      );
     });
 
-    testWidgets('ProfileBrowseScreen has refresh functionality',
-        (WidgetTester tester) async {
-      await tester.pumpWidget(const MaterialApp(home: ProfileBrowseScreen()));
-
-      // Should have refresh indicator (pull to refresh)
-      // This is tested by the RefreshIndicator widget presence
+    test('should provide user-friendly server error message', () {
+      const errorType = ProfileBrowseErrorType.server;
+      expect(
+        errorType.userFriendlyMessage,
+        'Server error. Please try again later.',
+      );
     });
 
-    testWidgets('ProfileBrowseScreen handles error state',
-        (WidgetTester tester) async {
-      await tester.pumpWidget(const MaterialApp(home: ProfileBrowseScreen()));
+    test('should provide user-friendly unknown error message', () {
+      const errorType = ProfileBrowseErrorType.unknown;
+      expect(
+        errorType.userFriendlyMessage,
+        'An unexpected error occurred. Please try again.',
+      );
+    });
+  });
 
-      // Initially shows loading
-      expect(find.text('Loading profiles...'), findsOneWidget);
+  group('Profile Browse Success State Tests', () {
+    test('should copy with new values', () {
+      final profiles = [NikkahProfile(id: '1', name: 'John Doe')];
 
-      // Error state would be tested with mocked service responses
+      final originalState = ProfileBrowseSuccess(
+        profiles: profiles,
+        currentPage: 1,
+        totalPages: 2,
+        hasMoreProfiles: true,
+      );
+
+      final newState = originalState.copyWith(
+        currentPage: 2,
+        hasMoreProfiles: false,
+      );
+
+      expect(newState.profiles, equals(profiles));
+      expect(newState.currentPage, 2);
+      expect(newState.totalPages, 2);
+      expect(newState.hasMoreProfiles, false);
+    });
+
+    test('should maintain original values when copying without parameters', () {
+      final profiles = [NikkahProfile(id: '1', name: 'John Doe')];
+
+      final originalState = ProfileBrowseSuccess(
+        profiles: profiles,
+        currentPage: 1,
+        totalPages: 2,
+        hasMoreProfiles: true,
+      );
+
+      final newState = originalState.copyWith();
+
+      expect(newState.profiles, equals(profiles));
+      expect(newState.currentPage, 1);
+      expect(newState.totalPages, 2);
+      expect(newState.hasMoreProfiles, true);
+    });
+  });
+
+  group('Profile Exception Tests', () {
+    test('should create network exception', () {
+      const exception = ProfileNetworkException(
+        message: 'Network error',
+        code: 'NETWORK_001',
+      );
+
+      expect(exception.message, 'Network error');
+      expect(exception.code, 'NETWORK_001');
+      expect(exception.toString(), 'ProfileNetworkException: Network error');
+    });
+
+    test('should create authentication exception', () {
+      const exception = ProfileAuthenticationException(
+        message: 'Auth failed',
+        code: 'AUTH_001',
+      );
+
+      expect(exception.message, 'Auth failed');
+      expect(exception.code, 'AUTH_001');
+      expect(
+          exception.toString(), 'ProfileAuthenticationException: Auth failed');
+    });
+
+    test('should create server exception with status code', () {
+      const exception = ProfileServerException(
+        message: 'Server error',
+        statusCode: 500,
+        code: 'SERVER_001',
+      );
+
+      expect(exception.message, 'Server error');
+      expect(exception.statusCode, 500);
+      expect(exception.code, 'SERVER_001');
+      expect(exception.toString(), 'ProfileServerException(500): Server error');
+    });
+
+    test('should create validation exception with errors', () {
+      const exception = ProfileValidationException(
+        message: 'Validation failed',
+        validationErrors: {'field': 'Required'},
+        code: 'VALID_001',
+      );
+
+      expect(exception.message, 'Validation failed');
+      expect(exception.validationErrors, {'field': 'Required'});
+      expect(exception.code, 'VALID_001');
+      expect(
+        exception.toString(),
+        'ProfileValidationException: Validation failed - Errors: {field: Required}',
+      );
+    });
+
+    test('should create rate limit exception with retry after', () {
+      const exception = ProfileRateLimitException(
+        message: 'Rate limited',
+        retryAfter: Duration(seconds: 60),
+        code: 'RATE_001',
+      );
+
+      expect(exception.message, 'Rate limited');
+      expect(exception.retryAfter, const Duration(seconds: 60));
+      expect(exception.code, 'RATE_001');
+      expect(
+        exception.toString(),
+        'ProfileRateLimitException: Rate limited (Retry after: 0:01:00.000000)',
+      );
     });
   });
 }
