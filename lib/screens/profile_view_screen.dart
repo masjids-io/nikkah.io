@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
 import '../models/nikkah_profile.dart';
 import '../services/profile_service.dart';
 
@@ -16,6 +17,7 @@ class ProfileViewScreen extends StatefulWidget {
 
 class _ProfileViewScreenState extends State<ProfileViewScreen> {
   bool _isLoading = false;
+  int _currentPictureIndex = 0;
 
   @override
   Widget build(BuildContext context) {
@@ -45,6 +47,8 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
                 children: [
                   _buildProfileHeader(),
                   const SizedBox(height: 24),
+                  _buildPictureGallery(),
+                  const SizedBox(height: 24),
                   _buildBasicInfo(),
                   const SizedBox(height: 24),
                   _buildLocationInfo(),
@@ -68,21 +72,8 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
     return Center(
       child: Column(
         children: [
-          // Profile Picture
-          CircleAvatar(
-            radius: 60,
-            backgroundColor: const Color(0xFF2E7D32),
-            child: Text(
-              (widget.profile.name?.isNotEmpty == true)
-                  ? widget.profile.name![0].toUpperCase()
-                  : '?',
-              style: const TextStyle(
-                fontSize: 40,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
-            ),
-          ),
+          // Profile Picture - Show first picture if available, otherwise show initials
+          _buildProfilePicture(),
           const SizedBox(height: 16),
 
           // Name and Age
@@ -121,6 +112,177 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildProfilePicture() {
+    final pictures = widget.profile.pictures;
+
+    // If pictures are available and not empty, show the first valid one
+    if (pictures != null && pictures.isNotEmpty) {
+      // Find the first picture with valid image data
+      final validPicture = pictures.firstWhere(
+        (pic) => pic.image != null && pic.image!.isNotEmpty,
+        orElse: () => Picture(),
+      );
+
+      if (validPicture.image != null) {
+        try {
+          return CircleAvatar(
+            radius: 60,
+            backgroundColor: const Color(0xFF2E7D32),
+            backgroundImage: MemoryImage(
+              base64Decode(validPicture.image!),
+            ),
+            onBackgroundImageError: (exception, stackTrace) {
+              // This callback is void, so we can't return a widget here
+              // The error will be handled by the errorBuilder in the gallery
+            },
+          );
+        } catch (e) {
+          // Fallback to initials if base64 decoding fails
+          return _buildInitialsAvatar();
+        }
+      }
+    }
+
+    // Fallback to initials avatar
+    return _buildInitialsAvatar();
+  }
+
+  Widget _buildInitialsAvatar() {
+    return CircleAvatar(
+      radius: 60,
+      backgroundColor: const Color(0xFF2E7D32),
+      child: Text(
+        (widget.profile.name?.isNotEmpty == true)
+            ? widget.profile.name![0].toUpperCase()
+            : '?',
+        style: const TextStyle(
+          fontSize: 40,
+          fontWeight: FontWeight.bold,
+          color: Colors.white,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPictureGallery() {
+    final pictures = widget.profile.pictures;
+
+    // Don't show gallery section if no pictures
+    if (pictures == null || pictures.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    // Filter out pictures with null or empty image data
+    final validPictures = pictures
+        .where((pic) => pic.image != null && pic.image!.isNotEmpty)
+        .toList();
+
+    // Don't show gallery section if no valid pictures or only one valid picture
+    if (validPictures.isEmpty || validPictures.length <= 1) {
+      return const SizedBox.shrink();
+    }
+
+    return _buildSection(
+      title: 'Photos',
+      icon: Icons.photo_library,
+      children: [
+        SizedBox(
+          height: 200,
+          child: PageView.builder(
+            itemCount: validPictures.length,
+            onPageChanged: (index) {
+              setState(() {
+                _currentPictureIndex = index;
+              });
+            },
+            itemBuilder: (context, index) {
+              final picture = validPictures[index];
+
+              try {
+                return Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 8),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.grey.withOpacity(0.3),
+                        spreadRadius: 2,
+                        blurRadius: 5,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Image.memory(
+                      base64Decode(picture.image!),
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return _buildPlaceholderImage();
+                      },
+                    ),
+                  ),
+                );
+              } catch (e) {
+                return _buildPlaceholderImage();
+              }
+            },
+          ),
+        ),
+        const SizedBox(height: 12),
+        // Picture indicators
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: List.generate(
+            validPictures.length,
+            (index) => Container(
+              width: 8,
+              height: 8,
+              margin: const EdgeInsets.symmetric(horizontal: 4),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: _currentPictureIndex == index
+                    ? const Color(0xFF2E7D32)
+                    : Colors.grey.shade300,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPlaceholderImage() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 8),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade200,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade300),
+      ),
+      child: const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.image_not_supported,
+              size: 48,
+              color: Colors.grey,
+            ),
+            SizedBox(height: 8),
+            Text(
+              'Image not available',
+              style: TextStyle(
+                color: Colors.grey,
+                fontSize: 14,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -173,12 +335,14 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
   }
 
   Widget _buildPhysicalInfo() {
+    final height = widget.profile.height;
+    final heightDisplay = height?.displayHeight ?? 'Not specified';
+
     return _buildSection(
       title: 'Physical Information',
       icon: Icons.height,
       children: [
-        _buildInfoRow(
-            'Height', widget.profile.height?.displayHeight ?? 'Not specified'),
+        _buildInfoRow('Height', heightDisplay),
       ],
     );
   }
