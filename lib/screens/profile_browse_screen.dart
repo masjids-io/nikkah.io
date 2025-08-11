@@ -1,7 +1,13 @@
 import 'package:flutter/material.dart';
-import '../services/profile_service.dart';
+import 'package:flutter/services.dart';
+import '../business/profile_browse_bloc.dart';
 import '../models/nikkah_profile.dart';
+import '../models/profile_browse_state.dart';
+import '../repositories/profile_repository.dart';
+import '../widgets/profile_browse_widgets.dart';
+import '../exceptions/profile_exceptions.dart';
 
+/// Profile Browse Screen with proper architecture
 class ProfileBrowseScreen extends StatefulWidget {
   final Function(Map<String, dynamic>)? onStartChat;
   final bool hasActiveChat;
@@ -17,294 +23,79 @@ class ProfileBrowseScreen extends StatefulWidget {
 }
 
 class _ProfileBrowseScreenState extends State<ProfileBrowseScreen> {
-  bool _isLoading = true;
-  bool _isLoadingMore = false;
-  String? _errorMessage;
-  List<NikkahProfile> _profiles = [];
-  int _currentPage = 1;
-  int _totalPages = 1;
-  bool _hasMoreProfiles = true;
-
-  // Search controller
-  final _searchController = TextEditingController();
-
-  // Filter state
-  Map<String, dynamic>? _currentFilters;
+  late final ProfileBrowseBloc _bloc;
+  final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
 
   @override
   void initState() {
     super.initState();
-    _loadProfiles();
+    // Initialize BLoC with repository
+    final repository = ProfileRepositoryImpl();
+    _bloc = ProfileBrowseBloc(repository: repository);
+
+    // Load initial profiles
+    _bloc.loadProfiles();
+
+    // Listen to BLoC changes
+    _bloc.addListener(_onBlocStateChanged);
   }
 
   @override
   void dispose() {
     _searchController.dispose();
+    _searchFocusNode.dispose();
+    _bloc.removeListener(_onBlocStateChanged);
+    _bloc.dispose();
     super.dispose();
   }
 
-  Future<void> _loadProfiles({bool refresh = false}) async {
-    try {
-      if (refresh) {
-        setState(() {
-          _isLoading = true;
-          _profiles = [];
-          _currentPage = 1;
-          _hasMoreProfiles = true;
-        });
-      } else {
-        setState(() {
-          _isLoadingMore = true;
-        });
-      }
-
-      _errorMessage = null;
-
-      // Build query parameters based on filters
-      final queryParams = <String, dynamic>{
-        'page': refresh ? 1 : _currentPage + 1,
-        'limit': 10,
-      };
-
-      // Add search term if provided
-      if (_searchController.text.isNotEmpty) {
-        queryParams['name'] = _searchController.text;
-      }
-
-      // Add filters if provided
-      if (_currentFilters != null) {
-        if (_currentFilters!['gender'] != null &&
-            _currentFilters!['gender'] != 'ALL') {
-          queryParams['gender'] = _currentFilters!['gender'];
-        }
-        if (_currentFilters!['location'] != null &&
-            _currentFilters!['location'].isNotEmpty) {
-          queryParams['location.city'] = _currentFilters!['location'];
-        }
-        if (_currentFilters!['education'] != null &&
-            _currentFilters!['education'] != 'ALL') {
-          queryParams['education'] = _currentFilters!['education'];
-        }
-        if (_currentFilters!['sect'] != null &&
-            _currentFilters!['sect'] != 'ALL') {
-          queryParams['sect'] = _currentFilters!['sect'];
-        }
-      }
-
-      // Call the API to get profiles
-      final response = await ProfileService.listNikkahProfiles(
-        start: queryParams['start'],
-        limit: queryParams['limit'],
-        page: queryParams['page'],
-        name: queryParams['name'],
-        gender: queryParams['gender'],
-        city: queryParams['location.city'],
-        education: queryParams['education'],
-        sect: queryParams['sect'],
-      );
-
-      final profiles = response.listProfilesResponse?.profiles ?? [];
-      final totalPages = response.listProfilesResponse?.totalPages ?? 1;
-      final currentPage = response.listProfilesResponse?.currentPage ?? 1;
-
-      setState(() {
-        if (refresh) {
-          _profiles = profiles;
-        } else {
-          _profiles.addAll(profiles);
-        }
-        _currentPage = currentPage;
-        _totalPages = totalPages;
-        _hasMoreProfiles = currentPage < totalPages;
-        _isLoading = false;
-        _isLoadingMore = false;
-      });
-    } catch (e) {
-      setState(() {
-        _errorMessage = 'Failed to load profiles: ${e.toString()}';
-        _isLoading = false;
-        _isLoadingMore = false;
-      });
-    }
-  }
-
-  Future<void> _searchProfiles() async {
-    await _loadProfiles(refresh: true);
-  }
-
-  Future<void> _openFilters() async {
-    final result = await Navigator.of(context).pushNamed('/filters');
-    if (result != null && result is Map<String, dynamic>) {
-      setState(() {
-        _currentFilters = result;
-      });
-      // Apply the filters by reloading profiles
-      await _loadProfiles(refresh: true);
-    }
-  }
-
-  void _viewProfile(NikkahProfile profile) {
-    // Check if there's an active chat
-    if (widget.hasActiveChat) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-              'Please end your current chat before viewing other profiles'),
-          backgroundColor: Colors.orange,
-        ),
-      );
-      return;
-    }
-
-    // Show profile view options
-    showModalBottomSheet(
-      context: context,
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.person, color: Color(0xFF2E7D32)),
-              title: const Text('View Profile'),
-              subtitle: Text('See ${profile.name}\'s full profile'),
-              onTap: () {
-                Navigator.of(context).pop();
-                Navigator.of(context).pushNamed(
-                  '/profile-view',
-                  arguments: profile,
-                );
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.favorite, color: Color(0xFF2E7D32)),
-              title: const Text('Like Profile'),
-              subtitle: Text('Show interest in ${profile.name}'),
-              onTap: () {
-                Navigator.of(context).pop();
-                _likeProfile(profile);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.chat, color: Color(0xFF2E7D32)),
-              title: const Text('Start Chat'),
-              subtitle: Text('Begin chatting with ${profile.name}'),
-              onTap: () {
-                Navigator.of(context).pop();
-                if (widget.onStartChat != null) {
-                  widget.onStartChat!({
-                    'id': profile.id ??
-                        'user-${DateTime.now().millisecondsSinceEpoch}',
-                    'name': profile.name ?? 'Unknown',
-                    'age': profile.age ?? 0,
-                    'location': profile.location?.displayLocation ?? 'Unknown',
-                  });
-                }
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<void> _likeProfile(NikkahProfile profile) async {
-    try {
-      // Get current user's profile first
-      final selfProfileResponse = await ProfileService.getSelfNikkahProfile();
-      final selfProfile = selfProfileResponse.nikkahProfile;
-
-      if (selfProfile == null) {
-        throw Exception('Unable to get your profile');
-      }
-
-      // Create like data
-      final likeData = {
-        'likerProfileId': selfProfile.id,
-        'likedProfileId': profile.id,
-      };
-
-      final response = await ProfileService.initiateNikkahLike(likeData);
-
-      if (response.code == '200' || response.status == 'success') {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('You liked ${profile.name}\'s profile!'),
-            backgroundColor: const Color(0xFF2E7D32),
-          ),
-        );
-      } else {
-        throw Exception(response.message ?? 'Failed to like profile');
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error: ${e.toString()}'),
-          backgroundColor: Colors.red,
-        ),
-      );
+  void _onBlocStateChanged() {
+    // Handle state changes if needed
+    if (_bloc.hasError) {
+      _showErrorSnackBar(_bloc.errorMessage ?? 'An error occurred');
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'Browse Profiles',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        backgroundColor: const Color(0xFF2E7D32),
-        elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.filter_list, color: Colors.white),
-            onPressed: _openFilters,
-            tooltip: 'Filter Profiles',
-          ),
-        ],
-      ),
+      appBar: _buildAppBar(),
       body: Column(
         children: [
-          // Search Bar
           _buildSearchBar(),
-
-          // Active Filters Display
-          if (_currentFilters != null) _buildActiveFilters(),
-
-          // Profiles List
+          if (_bloc.activeFilters != null) _buildActiveFilters(),
           Expanded(
-            child: _isLoading
-                ? const Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        CircularProgressIndicator(
-                          valueColor:
-                              AlwaysStoppedAnimation<Color>(Color(0xFF2E7D32)),
-                        ),
-                        SizedBox(height: 16),
-                        Text(
-                          'Loading profiles...',
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: Colors.grey,
-                          ),
-                        ),
-                      ],
-                    ),
-                  )
-                : _errorMessage != null
-                    ? _buildErrorWidget()
-                    : _profiles.isEmpty
-                        ? _buildEmptyState()
-                        : _buildProfilesList(),
+            child: ListenableBuilder(
+              listenable: _bloc,
+              builder: (context, child) {
+                return _buildContent();
+              },
+            ),
           ),
         ],
       ),
+    );
+  }
+
+  PreferredSizeWidget _buildAppBar() {
+    return AppBar(
+      title: const Text(
+        'Browse Profiles',
+        style: TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+      backgroundColor: const Color(0xFF2E7D32),
+      elevation: 0,
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.filter_list, color: Colors.white),
+          onPressed: _openFilters,
+          tooltip: 'Filter Profiles',
+        ),
+      ],
     );
   }
 
@@ -326,30 +117,37 @@ class _ProfileBrowseScreenState extends State<ProfileBrowseScreen> {
           Expanded(
             child: TextField(
               controller: _searchController,
-              decoration: const InputDecoration(
+              focusNode: _searchFocusNode,
+              decoration: InputDecoration(
                 hintText: 'Search profiles...',
-                prefixIcon: Icon(Icons.search, color: Color(0xFF2E7D32)),
-                border: OutlineInputBorder(),
-                focusedBorder: OutlineInputBorder(
+                prefixIcon: const Icon(Icons.search, color: Color(0xFF2E7D32)),
+                suffixIcon: _searchController.text.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: _clearSearch,
+                      )
+                    : null,
+                border: const OutlineInputBorder(),
+                focusedBorder: const OutlineInputBorder(
                   borderSide: BorderSide(color: Color(0xFF2E7D32), width: 2),
                 ),
                 contentPadding:
-                    EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               ),
-              onSubmitted: (_) => _searchProfiles(),
+              onChanged: _bloc.searchProfiles,
+              onSubmitted: (_) => _bloc.performImmediateSearch(),
+              textInputAction: TextInputAction.search,
             ),
           ),
           const SizedBox(width: 8),
           ElevatedButton(
-            onPressed: _searchProfiles,
+            onPressed: _bloc.performImmediateSearch,
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF2E7D32),
+              foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             ),
-            child: const Text(
-              'Search',
-              style: TextStyle(color: Colors.white),
-            ),
+            child: const Text('Search'),
           ),
         ],
       ),
@@ -359,22 +157,21 @@ class _ProfileBrowseScreenState extends State<ProfileBrowseScreen> {
   Widget _buildActiveFilters() {
     final activeFilters = <String>[];
 
-    if (_currentFilters != null) {
-      if (_currentFilters!['gender'] != null &&
-          _currentFilters!['gender'] != 'ALL') {
-        activeFilters.add(_currentFilters!['gender']);
+    if (_bloc.activeFilters != null) {
+      final filters = _bloc.activeFilters!;
+
+      if (filters['gender'] != null && filters['gender'] != 'ALL') {
+        activeFilters.add(filters['gender']);
       }
-      if (_currentFilters!['location'] != null &&
-          _currentFilters!['location'].isNotEmpty) {
-        activeFilters.add('Location: ${_currentFilters!['location']}');
+      if (filters['location'] != null &&
+          filters['location'].toString().isNotEmpty) {
+        activeFilters.add('Location: ${filters['location']}');
       }
-      if (_currentFilters!['education'] != null &&
-          _currentFilters!['education'] != 'ALL') {
-        activeFilters.add('Education: ${_currentFilters!['education']}');
+      if (filters['education'] != null && filters['education'] != 'ALL') {
+        activeFilters.add('Education: ${filters['education']}');
       }
-      if (_currentFilters!['sect'] != null &&
-          _currentFilters!['sect'] != 'ALL') {
-        activeFilters.add('Sect: ${_currentFilters!['sect']}');
+      if (filters['sect'] != null && filters['sect'] != 'ALL') {
+        activeFilters.add('Sect: ${filters['sect']}');
       }
     }
 
@@ -391,219 +188,220 @@ class _ProfileBrowseScreenState extends State<ProfileBrowseScreen> {
                 labelStyle: const TextStyle(color: Color(0xFF2E7D32)),
                 deleteIcon:
                     const Icon(Icons.close, size: 16, color: Color(0xFF2E7D32)),
-                onDeleted: () {
-                  setState(() {
-                    _currentFilters = null;
-                  });
-                  _loadProfiles(refresh: true);
-                },
+                onDeleted: _bloc.clearFilters,
               )),
         ],
       ),
     );
   }
 
-  Widget _buildErrorWidget() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(
-            Icons.error_outline,
-            size: 64,
-            color: Colors.red,
-          ),
-          const SizedBox(height: 16),
-          Text(
-            _errorMessage!,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontSize: 16,
-              color: Colors.red,
-            ),
-          ),
-          const SizedBox(height: 16),
-          ElevatedButton(
-            onPressed: () => _loadProfiles(refresh: true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF2E7D32),
-            ),
-            child: const Text('Retry'),
-          ),
-        ],
-      ),
+  Widget _buildContent() {
+    final strategy = ProfileDisplayStrategyFactory.createStrategy(
+      _bloc.state,
+      onRetry: _handleRetry,
+      onClearFilters: _handleClearFilters,
+      onLoadMore: _handleLoadMore,
+      onRefresh: _handleRefresh,
+      onProfileTap: _handleProfileTap,
     );
+
+    return strategy.build(context);
   }
 
-  Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(
-            Icons.people_outline,
-            size: 64,
-            color: Colors.grey,
-          ),
-          const SizedBox(height: 16),
-          const Text(
-            'No profiles found',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: Colors.grey,
-            ),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'Try adjusting your search or filters',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey,
-            ),
-          ),
-          const SizedBox(height: 16),
-          ElevatedButton(
-            onPressed: () {
-              setState(() {
-                _currentFilters = null;
-              });
-              _loadProfiles(refresh: true);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF2E7D32),
-            ),
-            child: const Text('Clear Filters'),
-          ),
-        ],
-      ),
-    );
+  Future<void> _openFilters() async {
+    try {
+      final result = await Navigator.of(context).pushNamed('/filters');
+      if (result != null && result is Map<String, dynamic>) {
+        await _bloc.applyFilters(result);
+      }
+    } catch (e) {
+      _showErrorSnackBar('Failed to open filters: ${e.toString()}');
+    }
   }
 
-  Widget _buildProfilesList() {
-    return RefreshIndicator(
-      onRefresh: () => _loadProfiles(refresh: true),
-      child: ListView.builder(
+  void _clearSearch() {
+    _searchController.clear();
+    _bloc.clearSearch();
+    _searchFocusNode.unfocus();
+  }
+
+  Future<void> _handleRetry() async {
+    try {
+      await _bloc.loadProfiles();
+    } catch (e) {
+      _showErrorSnackBar('Failed to retry: ${e.toString()}');
+    }
+  }
+
+  Future<void> _handleClearFilters() async {
+    try {
+      await _bloc.clearFilters();
+    } catch (e) {
+      _showErrorSnackBar('Failed to clear filters: ${e.toString()}');
+    }
+  }
+
+  Future<void> _handleLoadMore() async {
+    try {
+      await _bloc.loadMoreProfiles();
+    } catch (e) {
+      _showErrorSnackBar('Failed to load more profiles: ${e.toString()}');
+    }
+  }
+
+  Future<void> _handleRefresh() async {
+    try {
+      await _bloc.refresh();
+    } catch (e) {
+      _showErrorSnackBar('Failed to refresh: ${e.toString()}');
+    }
+  }
+
+  void _handleProfileTap(NikkahProfile profile) {
+    // Check if there's an active chat
+    if (widget.hasActiveChat) {
+      _showWarningSnackBar(
+          'Please end your current chat before viewing other profiles');
+      return;
+    }
+
+    _showProfileOptions(profile);
+  }
+
+  void _showProfileOptions(NikkahProfile profile) {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => Container(
         padding: const EdgeInsets.all(16),
-        itemCount: _profiles.length + (_hasMoreProfiles ? 1 : 0),
-        itemBuilder: (context, index) {
-          if (index == _profiles.length) {
-            return _buildLoadMoreButton();
-          }
-          return _buildProfileCard(_profiles[index]);
-        },
-      ),
-    );
-  }
-
-  Widget _buildProfileCard(NikkahProfile profile) {
-    final name = profile.name ?? 'Unknown';
-    final gender = profile.gender ?? 'GENDER_UNSPECIFIED';
-    final age = profile.age;
-    final ageText = age != null ? '$age years old' : 'Age not specified';
-    final location =
-        profile.location?.displayLocation ?? 'Location not specified';
-    final education = profile.education ?? 'Education not specified';
-    final occupation = profile.occupation ?? 'Occupation not specified';
-
-    return Card(
-      margin: const EdgeInsets.only(bottom: 16),
-      elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: InkWell(
-        onTap: () => _viewProfile(profile),
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              // Profile Avatar
-              CircleAvatar(
-                radius: 30,
-                backgroundColor: const Color(0xFF2E7D32),
-                child: Text(
-                  name.isNotEmpty ? name[0].toUpperCase() : '?',
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 16),
-
-              // Profile Info
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      name,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '$ageText • ${gender == 'MALE' ? 'Male' : 'Female'}',
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      location,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '$education • $occupation',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              // View Button
-              IconButton(
-                icon: const Icon(Icons.arrow_forward_ios,
-                    color: Color(0xFF2E7D32)),
-                onPressed: () => _viewProfile(profile),
-              ),
-            ],
-          ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.person, color: Color(0xFF2E7D32)),
+              title: const Text('View Profile'),
+              subtitle:
+                  Text('See ${profile.name ?? 'Unknown'}\'s full profile'),
+              onTap: () {
+                Navigator.of(context).pop();
+                _navigateToProfileView(profile);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.favorite, color: Color(0xFF2E7D32)),
+              title: const Text('Like Profile'),
+              subtitle: Text('Show interest in ${profile.name ?? 'Unknown'}'),
+              onTap: () {
+                Navigator.of(context).pop();
+                _likeProfile(profile);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.chat, color: Color(0xFF2E7D32)),
+              title: const Text('Start Chat'),
+              subtitle:
+                  Text('Begin chatting with ${profile.name ?? 'Unknown'}'),
+              onTap: () {
+                Navigator.of(context).pop();
+                _startChat(profile);
+              },
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildLoadMoreButton() {
-    if (!_hasMoreProfiles) return const SizedBox.shrink();
+  void _navigateToProfileView(NikkahProfile profile) {
+    try {
+      Navigator.of(context).pushNamed(
+        '/profile-view',
+        arguments: profile,
+      );
+    } catch (e) {
+      _showErrorSnackBar('Failed to open profile: ${e.toString()}');
+    }
+  }
 
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Center(
-        child: _isLoadingMore
-            ? const CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF2E7D32)),
-              )
-            : ElevatedButton(
-                onPressed: _loadProfiles,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF2E7D32),
-                ),
-                child: const Text('Load More'),
-              ),
+  Future<void> _likeProfile(NikkahProfile profile) async {
+    try {
+      await _bloc.likeProfile(profile);
+      _showSuccessSnackBar(
+          'You liked ${profile.name ?? 'Unknown'}\'s profile!');
+    } on ProfileAuthenticationException {
+      _showErrorSnackBar('Please log in again to like profiles');
+    } on ProfileValidationException catch (e) {
+      _showErrorSnackBar('Validation error: ${e.message}');
+    } on ProfileNetworkException {
+      _showErrorSnackBar('Network error. Please check your connection.');
+    } on ProfileServerException catch (e) {
+      _showErrorSnackBar('Server error: ${e.message}');
+    } catch (e) {
+      _showErrorSnackBar('Failed to like profile: ${e.toString()}');
+    }
+  }
+
+  void _startChat(NikkahProfile profile) {
+    try {
+      if (widget.onStartChat != null) {
+        widget.onStartChat!({
+          'id': profile.id ?? 'user-${DateTime.now().millisecondsSinceEpoch}',
+          'name': profile.name ?? 'Unknown',
+          'age': profile.age ?? 0,
+          'location': profile.location?.displayLocation ?? 'Unknown',
+        });
+      }
+    } catch (e) {
+      _showErrorSnackBar('Failed to start chat: ${e.toString()}');
+    }
+  }
+
+  void _showErrorSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
+        behavior: SnackBarBehavior.floating,
+        action: SnackBarAction(
+          label: 'Dismiss',
+          textColor: Colors.white,
+          onPressed: () {
+            ScaffoldMessenger.of(context).hideCurrentSnackBar();
+          },
+        ),
+      ),
+    );
+  }
+
+  void _showWarningSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.orange,
+        behavior: SnackBarBehavior.floating,
+        action: SnackBarAction(
+          label: 'Dismiss',
+          textColor: Colors.white,
+          onPressed: () {
+            ScaffoldMessenger.of(context).hideCurrentSnackBar();
+          },
+        ),
+      ),
+    );
+  }
+
+  void _showSuccessSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: const Color(0xFF2E7D32),
+        behavior: SnackBarBehavior.floating,
+        action: SnackBarAction(
+          label: 'Dismiss',
+          textColor: Colors.white,
+          onPressed: () {
+            ScaffoldMessenger.of(context).hideCurrentSnackBar();
+          },
+        ),
       ),
     );
   }

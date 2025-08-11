@@ -11,7 +11,6 @@ import 'screens/register_screen.dart';
 import 'screens/profile_creation_screen.dart';
 import 'screens/profile_view_screen.dart';
 import 'screens/profile_browse_screen.dart';
-import 'screens/profile_browse_screen_refactored.dart';
 import 'screens/main_navigation_screen.dart';
 import 'screens/filters_screen.dart';
 import 'screens/chat_screen.dart';
@@ -173,10 +172,6 @@ class NikkahApp extends StatelessWidget {
       case '/profile-browse':
         return MaterialPageRoute(
           builder: (context) => const ProfileBrowseScreen(),
-        );
-      case '/profile-browse-refactored':
-        return MaterialPageRoute(
-          builder: (context) => const ProfileBrowseScreenRefactored(),
         );
       case '/filters':
         return MaterialPageRoute(
