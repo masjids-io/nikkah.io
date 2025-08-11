@@ -13,11 +13,17 @@ class InputValidator {
   static const int maxPhoneLength = 20;
 
   // Allowed characters for different input types
-  static final RegExp namePattern = RegExp(r'^[a-zA-Z\s\-\.\']+$');
-  static final RegExp usernamePattern = RegExp(r'^[a-zA-Z0-9_]+$');
-  static final RegExp emailPattern = RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$');
-  static final RegExp phonePattern = RegExp(r'^[\+]?[0-9\s\-\(\)]+$');
-  static final RegExp safeTextPattern = RegExp(r'^[a-zA-Z0-9\s\-\.\,\!\?\:\;\(\)\'\"]+$');
+  // Allows letters from any language, spaces, hyphens, periods, and apostrophes.
+  static final RegExp namePattern = RegExp(r"^[\p{L}\s\-\.']+$", unicode: true);
+  // A standard, safe username format. Best combined with a length check.
+  static final RegExp usernamePattern = RegExp(r'^[a-zA-Z0-9_]{3,20}$');
+  // A pragmatic check for email structure. Real validation requires a confirmation email.
+  static final RegExp emailPattern = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
+  // A flexible pattern for user input. Sanitize to a canonical form before use.
+  static final RegExp phonePattern = RegExp(r'^[+]?[0-9\s\-()]+$');
+  // Allows a wide range of text/punctuation from any language for general inputs.
+  static final RegExp safeTextPattern =
+      RegExp(r"^[\p{L}\p{N}\p{P}\p{Z}]+$", unicode: true);
 
   /// Validate and sanitize email address
   static String? validateEmail(String? email) {
@@ -65,8 +71,20 @@ class InputValidator {
 
     // Check for reserved usernames
     final reservedUsernames = [
-      'admin', 'root', 'system', 'nikkah', 'api', 'www', 'mail', 'ftp',
-      'localhost', 'test', 'guest', 'anonymous', 'null', 'undefined'
+      'admin',
+      'root',
+      'system',
+      'nikkah',
+      'api',
+      'www',
+      'mail',
+      'ftp',
+      'localhost',
+      'test',
+      'guest',
+      'anonymous',
+      'null',
+      'undefined'
     ];
 
     if (reservedUsernames.contains(username.toLowerCase())) {
@@ -92,8 +110,18 @@ class InputValidator {
 
     // Check for common weak passwords
     final weakPasswords = [
-      'password', '123456', 'qwerty', 'admin', 'letmein', 'welcome',
-      'monkey', 'dragon', 'master', 'hello', 'freedom', 'whatever'
+      'password',
+      '123456',
+      'qwerty',
+      'admin',
+      'letmein',
+      'welcome',
+      'monkey',
+      'dragon',
+      'master',
+      'hello',
+      'freedom',
+      'whatever'
     ];
 
     if (weakPasswords.contains(password.toLowerCase())) {
@@ -129,7 +157,7 @@ class InputValidator {
     }
 
     // Check for suspicious patterns
-    if (name.toLowerCase().contains('script') || 
+    if (name.toLowerCase().contains('script') ||
         name.toLowerCase().contains('javascript') ||
         name.toLowerCase().contains('alert') ||
         name.toLowerCase().contains('eval')) {
@@ -172,9 +200,19 @@ class InputValidator {
 
     // Check for potential XSS patterns
     final xssPatterns = [
-      '<script', '</script>', 'javascript:', 'onload=', 'onerror=',
-      'onclick=', 'onmouseover=', 'eval(', 'document.cookie',
-      'window.location', 'alert(', 'confirm(', 'prompt('
+      '<script',
+      '</script>',
+      'javascript:',
+      'onload=',
+      'onerror=',
+      'onclick=',
+      'onmouseover=',
+      'eval(',
+      'document.cookie',
+      'window.location',
+      'alert(',
+      'confirm(',
+      'prompt('
     ];
 
     final lowerMessage = message.toLowerCase();
@@ -201,8 +239,15 @@ class InputValidator {
 
     // Check for potential XSS patterns
     final xssPatterns = [
-      '<script', '</script>', 'javascript:', 'onload=', 'onerror=',
-      'onclick=', 'onmouseover=', 'eval(', 'document.cookie'
+      '<script',
+      '</script>',
+      'javascript:',
+      'onload=',
+      'onerror=',
+      'onclick=',
+      'onmouseover=',
+      'eval(',
+      'document.cookie'
     ];
 
     final lowerBio = bio.toLowerCase();
@@ -219,19 +264,20 @@ class InputValidator {
   static String sanitizeText(String text) {
     // Remove HTML tags
     text = text.replaceAll(RegExp(r'<[^>]*>'), '');
-    
+
     // Remove script tags and content
-    text = text.replaceAll(RegExp(r'<script[^>]*>.*?</script>', dotAll: true), '');
-    
+    text =
+        text.replaceAll(RegExp(r'<script[^>]*>.*?</script>', dotAll: true), '');
+
     // Remove dangerous attributes
     text = text.replaceAll(RegExp(r'on\\w+'), '');
-    
+
     // Remove javascript: protocol
     text = text.replaceAll(RegExp(r'javascript:', caseSensitive: false), '');
-    
+
     // Remove eval() calls
     text = text.replaceAll(RegExp(r'eval\\s*\\([^)]*\\)'), '');
-    
+
     return text.trim();
   }
 
@@ -246,15 +292,15 @@ class InputValidator {
   static String? validateAge(DateTime birthDate) {
     final now = DateTime.now();
     final age = now.year - birthDate.year;
-    
+
     if (age < 18) {
       return 'You must be at least 18 years old';
     }
-    
+
     if (age > 120) {
       return 'Please enter a valid birth date';
     }
-    
+
     return null;
   }
 
@@ -279,7 +325,11 @@ class InputValidator {
     }
 
     final validEducation = [
-      'HIGH_SCHOOL', 'BACHELOR', 'MASTER', 'DOCTORATE', 'OTHER'
+      'HIGH_SCHOOL',
+      'BACHELOR',
+      'MASTER',
+      'DOCTORATE',
+      'OTHER'
     ];
 
     if (!validEducation.contains(education)) {
@@ -296,8 +346,12 @@ class InputValidator {
     }
 
     final validSects = [
-      'SUNNI', 'SUNNI_HANAFI', 'SUNNI_MALEKI', 'SUNNI_SHAFII', 
-      'SHIA', 'OTHER'
+      'SUNNI',
+      'SUNNI_HANAFI',
+      'SUNNI_MALEKI',
+      'SUNNI_SHAFII',
+      'SHIA',
+      'OTHER'
     ];
 
     if (!validSects.contains(sect)) {
@@ -306,4 +360,4 @@ class InputValidator {
 
     return null;
   }
-} 
+}
