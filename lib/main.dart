@@ -39,7 +39,7 @@ void main() async {
   _initializeLogging();
 
   // Run the app
-  runApp(const NikkahAppRefactored());
+  runApp(const NikkahApp());
 }
 
 /// Initialize application configuration
@@ -69,9 +69,9 @@ void _initializeLogging() {
   });
 }
 
-/// Refactored Nikkah App
-class NikkahAppRefactored extends StatelessWidget {
-  const NikkahAppRefactored({super.key});
+/// Nikkah App
+class NikkahApp extends StatelessWidget {
+  const NikkahApp({super.key});
 
   @override
   Widget build(BuildContext context) {

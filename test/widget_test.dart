@@ -14,7 +14,7 @@ void main() {
   group('Nikkah.io App Tests', () {
     testWidgets('App starts with splash screen', (WidgetTester tester) async {
       // Build our app and trigger a frame.
-      await tester.pumpWidget(const NikkahAppRefactored());
+      await tester.pumpWidget(const NikkahApp());
 
       // Verify that splash screen elements are present
       expect(find.text('Nikkah.io'), findsOneWidget);
@@ -34,7 +34,7 @@ void main() {
     testWidgets('App has proper theme configuration',
         (WidgetTester tester) async {
       // Build our app and trigger a frame.
-      await tester.pumpWidget(const NikkahAppRefactored());
+      await tester.pumpWidget(const NikkahApp());
 
       // Verify app title
       expect(find.text('Nikkah.io'), findsOneWidget);
