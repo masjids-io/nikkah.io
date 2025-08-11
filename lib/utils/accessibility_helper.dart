@@ -121,6 +121,9 @@ class AccessibilityHelper {
     int? maxLength,
     bool enabled = true,
   }) {
+    // Ensure password fields are always single-line
+    final effectiveMaxLines = obscureText ? 1 : maxLines;
+    
     return Semantics(
       label: label,
       hint: hint,
@@ -134,7 +137,7 @@ class AccessibilityHelper {
         textInputAction: textInputAction,
         onFieldSubmitted: (_) => onFieldSubmitted?.call(),
         focusNode: focusNode,
-        maxLines: maxLines,
+        maxLines: effectiveMaxLines,
         maxLength: maxLength,
         enabled: enabled,
         decoration: createAccessibleDecoration(
